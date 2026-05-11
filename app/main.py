@@ -1,12 +1,14 @@
 # main.py
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from app.Api.google_news import router as news_router  # ← import the router
+from datetime import datetime
+from app.Api.google_news import fetch_news, RSS_FEEDS
+from app.models import NewsResponse
 
 app = FastAPI(
     title="World News API",
-    description="Fetches and structures world news from Google News RSS Feed",
+    description="Fetches news by category from Google News RSS Feed",
     version="1.0.0",
 )
 
@@ -17,14 +19,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Health routes stay on main app
+
+# ── Health ──────────────────────────────────────────────────────────────
 @app.get("/", tags=["Health"])
 async def root():
     return {"status": "ok", "message": "World News API is running", "version": "1.0.0"}
 
+
 @app.get("/health", tags=["Health"])
 async def health():
-    from datetime import datetime
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat() + "Z"}
 
-app.include_router(news_router)  # ← registers all /news, /categories, /search routes
+
