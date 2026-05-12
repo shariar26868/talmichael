@@ -1,15 +1,14 @@
 # main.py
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
-from app.Api.google_news import fetch_news, RSS_FEEDS
-from app.models import NewsResponse
+from app.Api.google_news import router as news_router
 
 app = FastAPI(
-    title="World News API",
-    description="Fetches news by category from Google News RSS Feed",
-    version="1.0.0",
+    title="Israel News API",
+    description="Aggregates news from verified Israeli outlets across multiple categories.",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -19,15 +18,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Mount routers ────────────────────────────────────────────────────────
+app.include_router(news_router)
+
 
 # ── Health ──────────────────────────────────────────────────────────────
 @app.get("/", tags=["Health"])
 async def root():
-    return {"status": "ok", "message": "World News API is running", "version": "1.0.0"}
+    return {"status": "ok", "message": "Israel News API is running", "version": "2.0.0"}
 
 
 @app.get("/health", tags=["Health"])
 async def health():
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat() + "Z"}
-
-
