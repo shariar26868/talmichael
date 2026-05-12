@@ -1,5 +1,6 @@
-from pydantic_settings import BaseSettings
+#app/Api/config
 
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     app_name: str = "World News API"
@@ -12,3 +13,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
