@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 from app.Api.google_news import router as news_router
+from app.Api.social_media import router as social_media_router
 
 app = FastAPI(
     title="Israel News API",
@@ -20,6 +21,7 @@ app.add_middleware(
 
 # ── Mount routers ────────────────────────────────────────────────────────
 app.include_router(news_router)
+app.include_router(social_media_router)
 
 
 # ── Health ──────────────────────────────────────────────────────────────
