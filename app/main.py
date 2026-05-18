@@ -19,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Mount routers ────────────────────────────────────────────────────────
+
 app.include_router(news_router)
 app.include_router(social_media_router)
 
