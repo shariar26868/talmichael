@@ -24,7 +24,7 @@ app.include_router(news_router)
 app.include_router(social_media_router)
 
 
-# ── Health ──────────────────────────────────────────────────────────────
+
 @app.get("/", tags=["Health"])
 async def root():
     return {"status": "ok", "message": "Israel News API is running", "version": "2.0.0"}
