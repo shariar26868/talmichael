@@ -1,17 +1,41 @@
 services:
-  world-news-api:
+
+  mongo:
+    image: mongo:7
+    container_name: talmicahel-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: world-news-api
+    container_name: talmicahel-api
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
     ports:
       - "8000:8000"
     environment:
-      - DEBUG=false
-    restart: unless-stopped
+      - MONGODB_URL=mongodb://mongo:27017
+      - MONGODB_DB=talmicahel
+      - SECRET_KEY=${SECRET_KEY:-talmicahel_jwt_secret_key_32chars_min}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health').raise_for_status()"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 15s
+
+volumes:
+  mongo_data:

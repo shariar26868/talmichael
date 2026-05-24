@@ -1,15 +1,37 @@
-# main.py
+# app/main.py
+
+from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
-from app.Api.google_news import router as news_router
-from app.Api.social_media import router as social_media_router
+
+from app.core.database import init_db, close_db
+from app.routes.auth import router as auth_router
+from app.routes.news import router as news_router
+from app.routes.ai import router as ai_router
+from app.routes.social_media import router as social_router
+from app.routes.political import router as political_router
+from app.routes.correlation import router as correlation_router
+from app.routes.insights import router as insights_router
+from app.routes.qa import router as qa_router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    yield
+    await close_db()
+
 
 app = FastAPI(
-    title="Israel News API",
-    description="Aggregates news from verified Israeli outlets across multiple categories.",
-    version="2.0.0",
+    title="Israel News & Political Intelligence API",
+    description=(
+        "Real-time Israeli news aggregation with AI-powered bias detection, "
+        "sentiment analysis, Knesset intelligence, and political tracking."
+    ),
+    version="3.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -19,15 +41,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
+app.include_router(auth_router)
 app.include_router(news_router)
-app.include_router(social_media_router)
+app.include_router(ai_router)
+app.include_router(social_router)
+app.include_router(political_router)
+app.include_router(correlation_router)
+app.include_router(insights_router)
+app.include_router(qa_router)
 
 
-# ── Health ──────────────────────────────────────────────────────────────
 @app.get("/", tags=["Health"])
 async def root():
-    return {"status": "ok", "message": "Israel News API is running", "version": "2.0.0"}
+    return {"status": "ok", "version": "3.0.0", "docs": "/docs"}
 
 
 @app.get("/health", tags=["Health"])
