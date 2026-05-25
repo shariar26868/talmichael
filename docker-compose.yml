@@ -5,7 +5,7 @@ services:
     container_name: talmicahel-mongo
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "27018:27018"
     volumes:
       - mongo_data:/data/db
     healthcheck:
