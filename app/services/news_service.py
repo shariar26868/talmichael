@@ -6,6 +6,7 @@ import httpx
 from fastapi import HTTPException
 
 from app.core.cache import cache_get, cache_set, news_key, bills_key, NEWS_TTL, BILLS_TTL
+from app.core.config import settings
 from app.models.schemas import NewsResponse
 from app.utils.rss_parser import parse_rss
 from app.utils.filters import is_israeli_source, is_blocked_source, is_opinion, is_negative
@@ -18,8 +19,9 @@ async def fetch_news(
     israeli_only: bool,
     exclude_negative: bool = False,
     use_cache: bool = True,
+    with_analysis: bool = True,   # auto AI analysis on every article
 ) -> NewsResponse:
-    """Fetch, filter, and cache news for a given category."""
+    """Fetch, filter, cache, and optionally AI-analyze news."""
 
     # Cache check
     if use_cache:
@@ -59,7 +61,41 @@ async def fetch_news(
     news.articles = filtered[:limit]
     news.total = len(news.articles)
 
+    # ── Auto AI analysis ──────────────────────────────────────────────────────
+    if with_analysis and news.articles:
+        from app.services.ai_service import analyze_article
+        use_ai = bool(settings.openai_api_key)   # GPT if key present, else rule-based
+        analyses = await asyncio.gather(*[
+            analyze_article(
+                guid=a.guid or a.link,
+                title=a.title,
+                description=a.description,
+                source=a.source,
+                source_url=a.source_url,
+                use_ai=use_ai,
+            )
+            for a in news.articles
+        ], return_exceptions=True)
+
+        for article, analysis in zip(news.articles, analyses):
+            if not isinstance(analysis, Exception):
+                article.sentiment = analysis.sentiment
+                article.bias = analysis.bias
+                article.bias_score = analysis.bias_score
+                article.bias_types = analysis.bias_types
+                article.bias_category = analysis.bias_category
+                article.credibility_score = analysis.credibility_score
+                article.credibility_label = analysis.credibility_label
+                article.fact_check_score = analysis.fact_check_score
+                article.summary_hebrew = analysis.summary_hebrew
+                article.topics = analysis.topics
+                article.claims = analysis.claims
+                article.factual_points = analysis.factual_points
+                article.claim_explanation = analysis.claim_explanation
+                article.bias_explanation = analysis.bias_explanation
+
     if use_cache:
+        key = news_key(category, limit, israeli_only, exclude_negative)
         await cache_set(key, news.model_dump(), NEWS_TTL)
 
     return news
@@ -115,7 +151,6 @@ async def fetch_knesset_bills(limit: int = 20) -> dict:
                 ],
             }
         except Exception:
-            # Fallback to RSS
             news = await fetch_news("knesset", limit, israeli_only=True)
             result = {
                 "source": "Google News RSS (fallback)",

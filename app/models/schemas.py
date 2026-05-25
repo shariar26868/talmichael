@@ -26,8 +26,18 @@ class NewsArticle(BaseModel):
     # AI fields (populated when available)
     sentiment: Optional[str] = None
     bias: Optional[str] = None
+    bias_score: Optional[float] = None
+    bias_types: Optional[list[str]] = None
+    bias_category: Optional[str] = None
     credibility_score: Optional[float] = None
+    credibility_label: Optional[str] = None
+    fact_check_score: Optional[float] = None
     summary_hebrew: Optional[str] = None
+    topics: Optional[list[str]] = None
+    claims: Optional[list[str]] = None
+    factual_points: Optional[list[str]] = None
+    claim_explanation: Optional[str] = None
+    bias_explanation: Optional[str] = None
 
 
 class NewsResponse(BaseModel):
@@ -87,10 +97,18 @@ class ArticleAnalysis(BaseModel):
     guid: str
     sentiment: str           # positive / neutral / negative
     bias: str                # left / center / right / unknown
+    bias_score: float        # 0.0 – 1.0
+    bias_types: list[str]    # e.g. loaded language, framing, source leaning
+    bias_category: str       # descriptive bias category, e.g. Sensationalism, Loaded Language, Cherry-picking, Speculative Reporting, Partisan Framing, False Equivalence, Ad Hominem Attack, Context Omission, Emotional Appeal, Unsubstantiated Claims, Source Bias, Objective Reporting
     credibility_score: float # 0.0 – 1.0
+    credibility_label: str   # verified / likely credible / needs review / unverified
     fact_check_score: float  # 0.0 – 1.0
     summary_hebrew: str
     topics: list[str]        # extracted key topics
+    claims: list[str]
+    factual_points: list[str]
+    claim_explanation: str
+    bias_explanation: str
 
 
 class SourceBiasInfo(BaseModel):
