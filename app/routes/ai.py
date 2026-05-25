@@ -9,7 +9,6 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from app.core.auth import get_current_user
 from app.models.schemas import ArticleAnalysis
 from app.services.ai_service import analyze_article, analyze_batch, get_source_bias
 
@@ -35,14 +34,12 @@ class BatchAnalyzeRequest(BaseModel):
 @router.post("/analyze", response_model=ArticleAnalysis)
 async def analyze(
     body: AnalyzeRequest,
-    current_user: Optional[dict] = Depends(get_current_user),
 ):
     """
     Analyze a single article.
-    - Free / unauthenticated → rule-based (fast, no cost)
-    - Paid → GPT-4o powered
+    - Public → GPT-4o powered
     """
-    use_ai = current_user is not None and current_user.get("tier") in ("paid", "admin")
+    use_ai = True
     return await analyze_article(
         guid=body.guid,
         title=body.title,
@@ -56,17 +53,15 @@ async def analyze(
 @router.post("/analyze/batch", response_model=list[ArticleAnalysis])
 async def analyze_batch_endpoint(
     body: BatchAnalyzeRequest,
-    current_user: Optional[dict] = Depends(get_current_user),
 ):
     """
     Analyze up to 20 articles at once.
-    - Free → rule-based
-    - Paid → GPT-4o
+    - Public → GPT-4o
     """
     if len(body.articles) > 20:
         raise HTTPException(status_code=400, detail="Max 20 articles per batch")
 
-    use_ai = current_user is not None and current_user.get("tier") in ("paid", "admin")
+    use_ai = True
     return await analyze_batch(
         [a.model_dump() for a in body.articles],
         use_ai=use_ai,

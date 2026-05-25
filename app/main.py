@@ -7,7 +7,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.database import init_db, close_db
-from app.routes.auth import router as auth_router
 from app.routes.news import router as news_router
 from app.routes.ai import router as ai_router
 from app.routes.social_media import router as social_router
@@ -41,7 +40,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth_router)
 app.include_router(news_router)
 app.include_router(ai_router)
 app.include_router(social_router)

@@ -4,7 +4,6 @@ import json
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.core.auth import require_auth, require_admin, get_current_user
 from app.models.schemas import MPQuoteCreate, MPActionCreate, BillVoteRequest
 from app.services.political_service import (
     sync_mps, sync_parties, sync_committees,
@@ -18,7 +17,7 @@ router = APIRouter(prefix="/political", tags=["Political Intelligence"])
 
 
 @router.post("/sync")
-async def sync_all(_: dict = Depends(require_admin)):
+async def sync_all():
     mps = await sync_mps()
     parties = await sync_parties()
     committees = await sync_committees()
@@ -40,12 +39,12 @@ async def mp_profile(mp_id: str):
 
 
 @router.post("/mps/{mp_id}/quotes")
-async def add_mp_quote(mp_id: str, body: MPQuoteCreate, _: dict = Depends(require_auth)):
+async def add_mp_quote(mp_id: str, body: MPQuoteCreate):
     return await add_quote(mp_id, body.model_dump(exclude_none=True))
 
 
 @router.post("/mps/{mp_id}/actions")
-async def add_mp_action(mp_id: str, body: MPActionCreate, _: dict = Depends(require_auth)):
+async def add_mp_action(mp_id: str, body: MPActionCreate):
     return await add_action(mp_id, body.model_dump(exclude_none=True))
 
 
@@ -62,8 +61,8 @@ async def mp_actions(mp_id: str):
 
 
 @router.post("/mps/{mp_id}/contradictions/scan")
-async def scan_contradictions(mp_id: str, current_user: Optional[dict] = Depends(get_current_user)):
-    use_ai = current_user is not None and current_user.get("tier") in ("paid", "admin")
+async def scan_contradictions(mp_id: str):
+    use_ai = True
     found = await run_contradiction_scan(mp_id, use_ai=use_ai)
     return {"mp_id": mp_id, "new_contradictions_found": len(found), "contradictions": found}
 
@@ -95,8 +94,8 @@ async def list_committees():
 
 
 @router.post("/bills/{bill_id}/vote")
-async def vote_bill(bill_id: str, body: BillVoteRequest, user: dict = Depends(require_auth)):
-    return await vote_on_bill(bill_id, str(user["_id"]), body.support)
+async def vote_bill(bill_id: str, body: BillVoteRequest):
+    return await vote_on_bill(bill_id, "000000000000000000000000", body.support)
 
 
 @router.get("/bills/{bill_id}/tally")
