@@ -32,8 +32,8 @@ STOP_WORDS = {
 
 def _extract_keywords(text: str, top_n: int = 10) -> set[str]:
     """Extract meaningful keywords from text."""
-    words = re.findall(r'\b[a-zA-Z]{4,}\b', text.lower())
-    return {w for w in words if w not in STOP_WORDS}[:top_n] if words else set()
+    words = [w for w in re.findall(r'\b[a-zA-Z]{4,}\b', text.lower()) if w not in STOP_WORDS]
+    return set(words[:top_n]) if words else set()
 
 
 def _keyword_overlap(kw1: set[str], kw2: set[str]) -> float:

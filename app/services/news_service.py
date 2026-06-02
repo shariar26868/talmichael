@@ -10,7 +10,30 @@ from app.core.config import settings
 from app.models.schemas import NewsResponse
 from app.utils.rss_parser import parse_rss
 from app.utils.filters import is_israeli_source, is_blocked_source, is_opinion, is_negative
-from app.utils.feed_config import RSS_FEEDS, KNESSET_BILLS_API
+from app.utils.feed_config import (
+    RSS_FEEDS, KNESSET_BILLS_API, ISRAELI_SOURCES_FEEDS, 
+    INTERNATIONAL_SOURCES_FEEDS, ARABIC_SOURCES_FEEDS,
+    get_all_feeds, get_feeds_by_language
+)
+
+
+async def _fetch_single_feed(url: str, source_name: str, limit: int) -> list:
+    """Fetch and parse a single RSS feed."""
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            resp.raise_for_status()
+        news = parse_rss(resp.text, limit)
+        # Tag with source
+        for article in news.articles:
+            if not article.source:
+                article.source = source_name
+        return news.articles
+    except Exception as e:
+        # Log but don't fail — continue with other sources
+        import logging
+        logging.warning(f"Failed to fetch {source_name}: {e}")
+        return []
 
 
 async def fetch_news(
@@ -20,34 +43,54 @@ async def fetch_news(
     exclude_negative: bool = False,
     use_cache: bool = True,
     with_analysis: bool = True,   # auto AI analysis on every article
+    language: str = "english",   # hebrew | english | arabic
+    user_tier: str = "free",
 ) -> NewsResponse:
-    """Fetch, filter, cache, and optionally AI-analyze news."""
+    """Fetch, filter, cache, and optionally AI-analyze news from multiple sources."""
 
     # Cache check
     if use_cache:
-        key = news_key(category, limit, israeli_only, exclude_negative)
+        key = news_key(category, limit, israeli_only, exclude_negative, language, user_tier)
         cached = await cache_get(key)
         if cached:
             return NewsResponse(**cached)
 
-    url = RSS_FEEDS[category]
-    multiplier = max(1, 4 if israeli_only else 1, 6 if exclude_negative else 1)
-    raw_limit = limit * multiplier
-
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        try:
-            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
-            resp.raise_for_status()
-        except httpx.HTTPError as e:
-            raise HTTPException(status_code=502, detail=f"Failed to fetch RSS: {e}")
-
-    try:
-        news = parse_rss(resp.text, raw_limit)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse RSS: {e}")
-
+    # ── Step 1: Select sources based on parameters ────────────────────────────
+    
+    sources_to_fetch: dict[str, str] = {}
+    
+    if israeli_only:
+        sources_to_fetch = ISRAELI_SOURCES_FEEDS.copy()
+    elif language.lower() == "hebrew":
+        sources_to_fetch = ISRAELI_SOURCES_FEEDS.copy()
+    elif language.lower() == "arabic":
+        sources_to_fetch = ARABIC_SOURCES_FEEDS.copy()
+    else:
+        # English: combine international + Israeli sources
+        sources_to_fetch = INTERNATIONAL_SOURCES_FEEDS.copy()
+        sources_to_fetch.update(ISRAELI_SOURCES_FEEDS)
+    
+    # ── Step 2: Parallel fetch from multiple sources ──────────────────────────
+    
+    # Limit parallel requests to avoid overwhelming servers
+    per_source_limit = max(2, limit // 5)  # Distribute limit across sources
+    
+    fetch_tasks = [
+        _fetch_single_feed(feed_url, source_name, per_source_limit)
+        for source_name, feed_url in list(sources_to_fetch.items())[:15]  # Top 15 sources
+    ]
+    
+    results = await asyncio.gather(*fetch_tasks, return_exceptions=True)
+    all_articles = []
+    for result in results:
+        if isinstance(result, list):
+            all_articles.extend(result)
+        # Silently skip errors (already logged in _fetch_single_feed)
+    
+    # ── Step 3: Filter ────────────────────────────────────────────────────────
+    
     filtered = [
-        a for a in news.articles
+        a for a in all_articles
         if not is_opinion(a.title, a.description)
         and not is_blocked_source(a.source, a.source_url)
     ]
@@ -58,13 +101,35 @@ async def fetch_news(
     if exclude_negative:
         filtered = [a for a in filtered if not is_negative(a.title, a.description)]
 
-    news.articles = filtered[:limit]
-    news.total = len(news.articles)
+    # Remove duplicates (same URL)
+    seen_urls = set()
+    deduplicated = []
+    for article in filtered:
+        if article.link not in seen_urls:
+            seen_urls.add(article.link)
+            deduplicated.append(article)
+    
+    filtered = deduplicated[:limit]
+    
+    # ── Step 4: Create response ────────────────────────────────────────────────
+    
+    from app.utils.rss_parser import FeedMeta
+    news = NewsResponse(
+        meta=FeedMeta(
+            title=f"Israeli News - {category.title()}",
+            description=f"Top {len(filtered)} articles from {len(sources_to_fetch)} sources",
+            link="https://talmicahel.com",
+            last_build_date="",
+            fetched_at=""
+        ),
+        total=len(filtered),
+        articles=filtered
+    )
 
-    # ── Auto AI analysis ──────────────────────────────────────────────────────
+    # ── Step 5: Auto AI analysis ──────────────────────────────────────────────
+    
     if with_analysis and news.articles:
         from app.services.ai_service import analyze_article
-        use_ai = bool(settings.openai_api_key)   # GPT if key present, else rule-based
         analyses = await asyncio.gather(*[
             analyze_article(
                 guid=a.guid or a.link,
@@ -72,7 +137,7 @@ async def fetch_news(
                 description=a.description,
                 source=a.source,
                 source_url=a.source_url,
-                use_ai=use_ai,
+                user_tier=user_tier,
             )
             for a in news.articles
         ], return_exceptions=True)
@@ -95,13 +160,13 @@ async def fetch_news(
                 article.bias_explanation = analysis.bias_explanation
 
     if use_cache:
-        key = news_key(category, limit, israeli_only, exclude_negative)
+        key = news_key(category, limit, israeli_only, exclude_negative, language, user_tier)
         await cache_set(key, news.model_dump(), NEWS_TTL)
 
     return news
 
 
-async def fetch_all_news(limit: int) -> dict:
+async def fetch_all_news(limit: int, user_tier: str = "free") -> dict:
     """Fetch all categories concurrently."""
     from app.utils.feed_config import EXCLUDE_NEGATIVE_CATEGORIES
 
@@ -110,6 +175,7 @@ async def fetch_all_news(limit: int) -> dict:
             cat, limit,
             israeli_only=True,
             exclude_negative=(cat in EXCLUDE_NEGATIVE_CATEGORIES),
+            user_tier=user_tier,
         )
         for cat in RSS_FEEDS
     ]

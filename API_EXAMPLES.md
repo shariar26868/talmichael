@@ -567,6 +567,190 @@ GET /political/bills/64f1a2b3c4d5e6f7a8b9c0d3/tally
 
 ---
 
+## ⭐ User Voting & Credibility Validation
+
+### Vote on Article Bias
+```http
+POST /ai/articles/article-guid-123/vote/bias?user_id=USER_ID&user_tier=pro
+Content-Type: application/json
+
+{
+  "bias_assessment": "left",
+  "confidence": 0.85,
+  "user_notes": "The article uses loaded language and cherry-picks facts"
+}
+```
+**Response:**
+```json
+{
+  "status": "recorded",
+  "vote_id": "64f1a2b3c4d5e6f7a8b9c0d1",
+  "article_id": "article-guid-123",
+  "recorded_at": "2026-05-26T10:30:00Z"
+}
+```
+
+### Vote on Source Credibility
+```http
+POST /ai/sources/Haaretz/vote/credibility?user_id=USER_ID&user_tier=pro
+Content-Type: application/json
+
+{
+  "credibility_level": "high",
+  "evidence": "Generally accurate reporting, good fact-checking, transparent corrections"
+}
+```
+**Response:**
+```json
+{
+  "status": "recorded",
+  "vote_id": "64f1a2b3c4d5e6f7a8b9c0d2",
+  "source_name": "Haaretz",
+  "recorded_at": "2026-05-26T10:30:00Z"
+}
+```
+
+### Flag Article for Review
+```http
+POST /ai/articles/article-guid-123/flag?user_id=USER_ID
+Content-Type: application/json
+
+{
+  "reason": "misinformation",
+  "details": "This article contains false statistics about Israeli GDP growth. Official figures from the Central Bureau of Statistics show different numbers."
+}
+```
+**Response:**
+```json
+{
+  "status": "flagged",
+  "flag_id": "64f1a2b3c4d5e6f7a8b9c0d3",
+  "article_id": "article-guid-123",
+  "reason": "misinformation",
+  "message": "Thank you for helping us maintain quality. Our team will review this."
+}
+```
+
+### View Article Votes
+```http
+GET /ai/articles/article-guid-123/votes
+```
+**Response:**
+```json
+{
+  "article_id": "article-guid-123",
+  "bias_votes_count": 12,
+  "flags_count": 2,
+  "votes": {
+    "bias_votes": [
+      {
+        "bias_assessment": "left",
+        "confidence": 0.85,
+        "created_at": "2026-05-26T10:30:00Z",
+        "helpful_count": 3
+      },
+      {
+        "bias_assessment": "center",
+        "confidence": 0.72,
+        "created_at": "2026-05-26T10:28:00Z",
+        "helpful_count": 5
+      }
+    ],
+    "flag_count": 2,
+    "flags_by_reason": {
+      "misinformation": 1,
+      "biased": 1
+    }
+  }
+}
+```
+
+### View Source Credibility Votes
+```http
+GET /ai/sources/Haaretz/votes
+```
+**Response:**
+```json
+{
+  "source_name": "Haaretz",
+  "votes": {
+    "credibility_votes": [
+      {
+        "credibility_level": "high",
+        "credibility_score": 0.8,
+        "created_at": "2026-05-26T10:30:00Z",
+        "helpful_count": 7
+      },
+      {
+        "credibility_level": "medium",
+        "credibility_score": 0.5,
+        "created_at": "2026-05-26T10:29:00Z",
+        "helpful_count": 2
+      }
+    ],
+    "total_votes": 2
+  }
+}
+```
+
+### Mark Vote as Helpful
+```http
+POST /ai/votes/64f1a2b3c4d5e6f7a8b9c0d1/helpful?vote_type=bias
+```
+**Response:**
+```json
+{
+  "status": "upvoted",
+  "vote_id": "64f1a2b3c4d5e6f7a8b9c0d1"
+}
+```
+
+### View User Vote History
+```http
+GET /ai/user/USER_ID/vote-history?limit=50
+```
+**Response:**
+```json
+{
+  "user_id": "USER_ID",
+  "reputation": {
+    "bias_votes": 15,
+    "credibility_votes": 8,
+    "flags_submitted": 3
+  },
+  "recent_activity": {
+    "bias_votes": [...],
+    "credibility_votes": [...],
+    "flags": [...]
+  }
+}
+```
+
+### View Top Voters Leaderboard
+```http
+GET /ai/votes/leaderboard?limit=10
+```
+**Response:**
+```json
+{
+  "leaderboard": [
+    {
+      "_id": "user-123",
+      "total_votes": 287,
+      "helpful_votes": 445
+    },
+    {
+      "_id": "user-456",
+      "total_votes": 156,
+      "helpful_votes": 312
+    }
+  ],
+  "description": "Top voters by helpful votes received"
+}
+```
+
+---
+
 ## 🐦 Social Media
 
 ### Search Twitter

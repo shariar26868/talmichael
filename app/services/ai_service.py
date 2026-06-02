@@ -14,9 +14,12 @@ Uses OpenAI GPT-4o.  Falls back to rule-based analysis when
 OPENAI_API_KEY is not set (free-tier / dev mode).
 """
 
+import asyncio
 import json
 import logging
 from typing import Optional
+
+import httpx
 
 from app.core.config import settings
 from app.core.cache import cache_get, cache_set, ai_analysis_key, AI_TTL
@@ -472,6 +475,187 @@ async def _openai_analysis(
         return None
 
 
+async def _perplexity_analysis(
+    title: str,
+    description: str,
+    source: Optional[str],
+) -> Optional[dict]:
+    """Call Perplexity for article analysis and return a parsed JSON object."""
+    if not settings.perplexity_api_key:
+        return None
+
+    try:
+        user_content = (
+            f"Source: {source or 'Unknown'}\n"
+            f"Title: {title}\n"
+            f"Description: {description[:1000]}"
+        )
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.post(
+                "https://api.perplexity.ai/chat/completions",
+                headers={"Authorization": f"Bearer {settings.perplexity_api_key}"},
+                json={
+                    "model": "pplx-7b-online",
+                    "messages": [
+                        {"role": "system", "content": _SYSTEM_PROMPT},
+                        {"role": "user", "content": user_content},
+                    ],
+                    "temperature": 0.1,
+                    "max_tokens": 800,
+                },
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+
+        content = None
+        if isinstance(payload, dict):
+            choices = payload.get("choices") or []
+            if choices:
+                message = choices[0].get("message") or {}
+                content = message.get("content") or choices[0].get("text")
+            elif payload.get("content"):
+                content = payload.get("content")
+            elif payload.get("answer"):
+                content = payload.get("answer")
+
+        if not content:
+            return None
+
+        if isinstance(content, str):
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                import re
+                match = re.search(r"\{.*\}", content, re.S)
+                if match:
+                    return json.loads(match.group(0))
+        elif isinstance(content, dict):
+            return content
+    except Exception as e:
+        logger.warning("Perplexity analysis failed: %s", e)
+
+    return None
+
+
+async def _gemini_analysis(
+    title: str,
+    description: str,
+    source: Optional[str],
+) -> Optional[dict]:
+    """Call Gemini for article analysis and return a parsed JSON object."""
+    if not settings.gemini_api_key:
+        return None
+
+    try:
+        user_content = (
+            f"Source: {source or 'Unknown'}\n"
+            f"Title: {title}\n"
+            f"Description: {description[:1000]}"
+        )
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.post(
+                "https://api.gemini.ai/v1/generate",
+                headers={
+                    "Authorization": f"Bearer {settings.gemini_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "gemini-1",
+                    "prompt": user_content,
+                    "max_output_tokens": 800,
+                    "temperature": 0.1,
+                },
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+
+        content = None
+        if isinstance(payload, dict):
+            # Support multiple response shapes
+            content = payload.get("output") or payload.get("completion") or payload.get("response") or payload.get("answer")
+
+        if not content:
+            return None
+
+        if isinstance(content, str):
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                import re
+                match = re.search(r"\{.*\}", content, re.S)
+                if match:
+                    return json.loads(match.group(0))
+        elif isinstance(content, dict):
+            return content
+    except Exception as e:
+        logger.warning("Gemini analysis failed: %s", e)
+
+    return None
+
+
+def _merge_analysis(results: list[ArticleAnalysis], guid: str) -> ArticleAnalysis:
+    """Aggregate multiple ArticleAnalysis results into a single consensus output."""
+    if not results:
+        raise ValueError("No analysis results to merge")
+
+    primary = results[0]
+    numeric_fields = ["bias_score", "credibility_score", "fact_check_score"]
+    averages = {}
+    for field in numeric_fields:
+        values = [getattr(r, field) for r in results if getattr(r, field, None) is not None]
+        averages[field] = round(sum(values) / len(values), 2) if values else getattr(primary, field)
+
+    bias_votes = {}
+    category_votes = {}
+    label_votes = {}
+    for result in results:
+        bias_votes[result.bias] = bias_votes.get(result.bias, 0) + 1
+        category_votes[result.bias_category] = category_votes.get(result.bias_category, 0) + 1
+        label_votes[result.credibility_label] = label_votes.get(result.credibility_label, 0) + 1
+
+    bias = max(bias_votes, key=bias_votes.get)
+    bias_category = max(category_votes, key=category_votes.get)
+    credibility_label = max(label_votes, key=label_votes.get)
+
+    merged_types = []
+    merged_topics = []
+    merged_claims = []
+    merged_facts = []
+    for result in results:
+        for value, target, limit in [
+            (result.bias_types, merged_types, 5),
+            (result.topics, merged_topics, 5),
+            (result.claims, merged_claims, 5),
+            (result.factual_points, merged_facts, 5),
+        ]:
+            for item in value:
+                if item not in target and len(target) < limit:
+                    target.append(item)
+
+    explanations = [r.bias_explanation for r in results if r.bias_explanation]
+    claim_explanations = [r.claim_explanation for r in results if r.claim_explanation]
+    summaries = [r.summary_hebrew for r in results if r.summary_hebrew]
+
+    result = ArticleAnalysis(
+        guid=guid,
+        sentiment=primary.sentiment,
+        bias=bias,
+        bias_score=averages["bias_score"],
+        bias_types=merged_types or primary.bias_types,
+        bias_category=bias_category,
+        credibility_score=averages["credibility_score"],
+        credibility_label=credibility_label,
+        fact_check_score=averages["fact_check_score"],
+        summary_hebrew=summaries[0] if summaries else primary.summary_hebrew,
+        topics=merged_topics or primary.topics,
+        claims=merged_claims or primary.claims,
+        factual_points=merged_facts or primary.factual_points,
+        claim_explanation=claim_explanations[0] if claim_explanations else primary.claim_explanation,
+        bias_explanation=explanations[0] if explanations else primary.bias_explanation,
+    )
+    return result
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 async def analyze_article(
@@ -480,88 +664,118 @@ async def analyze_article(
     description: str,
     source: Optional[str] = None,
     source_url: Optional[str] = None,
-    use_ai: bool = False,       # True only for paid users
+    user_tier: str = "free",
 ) -> ArticleAnalysis:
     """
-    Analyze a single article.
+    Analyze a single article using a tiered model strategy.
 
-    Args:
-        guid:        Unique article identifier (used as cache key).
-        title:       Article headline.
-        description: Article snippet/description.
-        source:      Source outlet name.
-        source_url:  Source outlet URL.
-        use_ai:      When True and OPENAI_API_KEY is set, uses GPT-4o.
-                     Otherwise falls back to rule-based analysis.
+        Tiers:
+            - free: rule-based only
+            - pro: GPT-4o-mini with rule-based fallback
+            - platinum: GPT-4o-mini + Perplexity + Gemini + rule-based fallback
     """
-    # Cache check
     cache_key = ai_analysis_key(guid)
     cached = await cache_get(cache_key)
     if cached:
         return ArticleAnalysis(**cached)
 
+    tier = (user_tier or "free").strip().lower()
     result: Optional[ArticleAnalysis] = None
 
-    # AI path (paid users + API key present)
-    if use_ai and settings.openai_api_key:
-        raw = await _openai_analysis(title, description, source)
-        if raw:
-            try:
-                result = ArticleAnalysis(
-                    guid=guid,
-                    sentiment=raw.get("sentiment", "neutral"),
-                    bias=raw.get("bias", "unknown"),
-                    bias_score=float(raw.get("bias_score", 0.5)),
-                    bias_types=raw.get("bias_types", []),
-                    credibility_score=float(raw.get("credibility_score", 0.5)),
-                    credibility_label=raw.get("credibility_label", "needs review"),
-                    fact_check_score=float(raw.get("fact_check_score", 0.5)),
-                    summary_hebrew=raw.get("summary_hebrew", ""),
-                    topics=raw.get("topics", ["general"]),
-                    claims=raw.get("claims", []),
-                    factual_points=raw.get("factual_points", []),
-                    bias_category=raw.get("bias_category", ""),
-                    claim_explanation=raw.get("claim_explanation", ""),
-                    bias_explanation=raw.get("bias_explanation", ""),
-                    bias_score_explanation=raw.get("bias_score_explanation", ""),
-                )
-                # If OpenAI returns empty arrays for key extraction fields, merge rule-based fallback
-                if not result.bias_types or not result.claims or not result.factual_points or not result.bias_category:
-                    fallback = _rule_based_analysis(title, description, source, source_url)
-                    if not result.bias_types:
-                        result.bias_types = fallback.bias_types
-                    if not result.claims:
-                        result.claims = fallback.claims
-                    if not result.factual_points:
-                        result.factual_points = fallback.factual_points
-                    if not result.claim_explanation:
-                        result.claim_explanation = fallback.claim_explanation
-                    if not result.bias_explanation:
-                        result.bias_explanation = fallback.bias_explanation
-                    if not result.bias_category:
-                        result.bias_category = fallback.bias_category
-            except Exception as e:
-                logger.warning("Failed to parse OpenAI response: %s", e)
-
-    # Rule-based fallback
-    if result is None:
+    if tier == "free":
         result = _rule_based_analysis(title, description, source, source_url)
         result.guid = guid
 
-    # Cache result
+    elif tier == "pro":
+        if settings.openai_api_key:
+            raw = await _openai_analysis(title, description, source)
+            if raw:
+                try:
+                    result = ArticleAnalysis(
+                        guid=guid,
+                        sentiment=raw.get("sentiment", "neutral"),
+                        bias=raw.get("bias", "unknown"),
+                        bias_score=float(raw.get("bias_score", 0.5)),
+                        bias_types=raw.get("bias_types", []),
+                        credibility_score=float(raw.get("credibility_score", 0.5)),
+                        credibility_label=raw.get("credibility_label", "needs review"),
+                        fact_check_score=float(raw.get("fact_check_score", 0.5)),
+                        summary_hebrew=raw.get("summary_hebrew", ""),
+                        topics=raw.get("topics", ["general"]),
+                        claims=raw.get("claims", []),
+                        factual_points=raw.get("factual_points", []),
+                        bias_category=raw.get("bias_category", ""),
+                        claim_explanation=raw.get("claim_explanation", ""),
+                        bias_explanation=raw.get("bias_explanation", ""),
+                        bias_score_explanation=raw.get("bias_score_explanation", ""),
+                    )
+                except Exception as e:
+                    logger.warning("Failed to parse OpenAI response: %s", e)
+
+        if result is None:
+            result = _rule_based_analysis(title, description, source, source_url)
+            result.guid = guid
+
+    elif tier == "platinum":
+        tasks = []
+        if settings.openai_api_key:
+            tasks.append(_openai_analysis(title, description, source))
+        if settings.perplexity_api_key:
+            tasks.append(_perplexity_analysis(title, description, source))
+        if settings.gemini_api_key:
+            tasks.append(_gemini_analysis(title, description, source))
+
+        responses = await asyncio.gather(*tasks, return_exceptions=True) if tasks else []
+        analyses: list[ArticleAnalysis] = []
+
+        for response in responses:
+            if isinstance(response, Exception) or response is None:
+                continue
+            if isinstance(response, dict):
+                try:
+                    analysis = ArticleAnalysis(
+                        guid=guid,
+                        sentiment=response.get("sentiment", "neutral"),
+                        bias=response.get("bias", "unknown"),
+                        bias_score=float(response.get("bias_score", 0.5)),
+                        bias_types=response.get("bias_types", []),
+                        credibility_score=float(response.get("credibility_score", 0.5)),
+                        credibility_label=response.get("credibility_label", "needs review"),
+                        fact_check_score=float(response.get("fact_check_score", 0.5)),
+                        summary_hebrew=response.get("summary_hebrew", ""),
+                        topics=response.get("topics", ["general"]),
+                        claims=response.get("claims", []),
+                        factual_points=response.get("factual_points", []),
+                        bias_category=response.get("bias_category", ""),
+                        claim_explanation=response.get("claim_explanation", ""),
+                        bias_explanation=response.get("bias_explanation", ""),
+                    )
+                    analyses.append(analysis)
+                except Exception as e:
+                    logger.warning("Failed to parse ensemble response: %s", e)
+
+        if analyses:
+            result = _merge_analysis(analyses, guid)
+        else:
+            result = _rule_based_analysis(title, description, source, source_url)
+            result.guid = guid
+
+    else:
+        result = _rule_based_analysis(title, description, source, source_url)
+        result.guid = guid
+
     await cache_set(cache_key, result.model_dump(), AI_TTL)
     return result
 
 
 async def analyze_batch(
     articles: list[dict],
-    use_ai: bool = False,
+    user_tier: str = "free",
 ) -> list[ArticleAnalysis]:
     """
     Analyze a list of articles concurrently.
     Each dict must have: guid, title, description, source (optional), source_url (optional).
     """
-    import asyncio
     tasks = [
         analyze_article(
             guid=a.get("guid", ""),
@@ -569,7 +783,7 @@ async def analyze_batch(
             description=a.get("description", ""),
             source=a.get("source"),
             source_url=a.get("source_url"),
-            use_ai=use_ai,
+            user_tier=user_tier,
         )
         for a in articles
     ]

@@ -100,6 +100,7 @@ class ArticleAnalysis(BaseModel):
     bias_score: float        # 0.0 – 1.0
     bias_types: list[str]    # e.g. loaded language, framing, source leaning
     bias_category: str       # descriptive bias category, e.g. Sensationalism, Loaded Language, Cherry-picking, Speculative Reporting, Partisan Framing, False Equivalence, Ad Hominem Attack, Context Omission, Emotional Appeal, Unsubstantiated Claims, Source Bias, Objective Reporting
+    bias_score_explanation: str
     credibility_score: float # 0.0 – 1.0
     credibility_label: str   # verified / likely credible / needs review / unverified
     fact_check_score: float  # 0.0 – 1.0
@@ -154,6 +155,38 @@ class CommunityArticleOut(BaseModel):
 
 class BillVoteRequest(BaseModel):
     support: bool  # True = support, False = oppose
+
+
+class BillSummaryOut(BaseModel):
+    id: str
+    bill_id: str
+    name: str
+    name_hebrew: Optional[str] = None
+    status: Optional[str] = None
+    type: Optional[str] = None
+    sub_type: Optional[str] = None
+    initiator: Optional[str] = None
+    initiator_party: Optional[str] = None
+    committee: Optional[str] = None
+    summary: Optional[str] = None
+    ai_summary: Optional[str] = None
+    last_updated: Optional[str] = None
+    source: Optional[str] = None
+    community_tally: Optional[dict] = None
+    official_vote_summary: Optional[dict] = None
+    model_config = {"from_attributes": True}
+
+
+class BillVoteRecordOut(BaseModel):
+    bill_id: str
+    mp_id: Optional[str] = None
+    knesset_person_id: Optional[str] = None
+    mp_name: str
+    party: Optional[str] = None
+    vote: str
+    vote_date: Optional[str] = None
+    source: Optional[str] = None
+    model_config = {"from_attributes": True}
 
 
 # ── Political ─────────────────────────────────────────────────────────────────
@@ -218,3 +251,69 @@ class CommitteeOut(BaseModel):
     chair: Optional[str] = None
     description: Optional[str] = None
     model_config = {"from_attributes": True}
+
+
+# ── Voting & Credibility ──────────────────────────────────────────────────────
+
+class BiasVoteCreate(BaseModel):
+    """User submits bias assessment for an article."""
+    bias_assessment: str  # "left" | "center" | "right" | "unclear"
+    confidence: float     # 0.0 - 1.0
+    user_notes: Optional[str] = None
+
+
+class CredibilityVoteCreate(BaseModel):
+    """User votes on source credibility."""
+    credibility_level: str  # "very_low" | "low" | "medium" | "high" | "very_high"
+    evidence: Optional[str] = None
+
+
+class FlagArticleCreate(BaseModel):
+    """User flags article for misinformation or bias."""
+    reason: str  # "misinformation" | "propaganda" | "biased" | "unreliable_source"
+    details: str
+
+
+class BiasVoteResponse(BaseModel):
+    """Response after submitting bias vote."""
+    status: str
+    vote_id: str
+    article_id: str
+    recorded_at: str
+    new_consensus: Optional[dict] = None
+
+
+class CredibilityVoteResponse(BaseModel):
+    """Response after submitting credibility vote."""
+    status: str
+    vote_id: str
+    source_name: str
+    recorded_at: str
+    updated_credibility: Optional[dict] = None
+
+
+class VoteStats(BaseModel):
+    """Stats about votes on an article/source."""
+    total_votes: int
+    consensus: str  # The winning assessment
+    consensus_percentage: float
+    breakdown: dict  # {"left": 45, "center": 30, "right": 25}
+    flagged: int  # Number of flags
+
+
+class BiasConsensus(BaseModel):
+    """Final bias assessment combining AI + user votes."""
+    bias: str  # "left" | "center" | "right" | "unknown"
+    confidence: float
+    based_on: str  # "ai" | "user_consensus" | "mixed"
+    vote_count: int
+    stats: Optional[VoteStats] = None
+
+
+class CredibilityConsensus(BaseModel):
+    """Final credibility assessment combining AI + user votes."""
+    credibility_score: float  # 0.0 - 1.0
+    credibility_label: str  # "verified" | "likely credible" | "needs review" | "unverified"
+    based_on: str  # "ai" | "user_consensus" | "mixed"
+    vote_count: int
+    stats: Optional[VoteStats] = None

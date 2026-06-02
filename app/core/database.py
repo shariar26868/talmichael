@@ -46,6 +46,13 @@ async def init_db() -> None:
         IndexModel([("bill_id", ASCENDING)], unique=True),
     ])
 
+    # bill vote records (Knesset official votes)
+    await db.bill_vote_records.create_indexes([
+        IndexModel([("bill_id", ASCENDING)]),
+        IndexModel([("mp_object_id", ASCENDING)]),
+        IndexModel([("knesset_person_id", ASCENDING)]),
+    ])
+
     # mps
     await db.mps.create_indexes([
         IndexModel([("knesset_id", ASCENDING)], unique=True, sparse=True),
@@ -71,6 +78,31 @@ async def init_db() -> None:
     # source_credibility
     await db.source_credibility.create_indexes([
         IndexModel([("source_name", ASCENDING)], unique=True),
+    ])
+
+    # bias_votes
+    await db.bias_votes.create_indexes([
+        IndexModel([("article_id", ASCENDING)]),
+        IndexModel([("user_id", ASCENDING)]),
+        IndexModel([("created_at", DESCENDING)]),
+        IndexModel([("helpful_count", DESCENDING)]),
+    ])
+
+    # credibility_votes
+    await db.credibility_votes.create_indexes([
+        IndexModel([("source_name", ASCENDING)]),
+        IndexModel([("user_id", ASCENDING)]),
+        IndexModel([("created_at", DESCENDING)]),
+        IndexModel([("helpful_count", DESCENDING)]),
+    ])
+
+    # article_flags
+    await db.article_flags.create_indexes([
+        IndexModel([("article_id", ASCENDING)]),
+        IndexModel([("user_id", ASCENDING)]),
+        IndexModel([("reason", ASCENDING)]),
+        IndexModel([("status", ASCENDING)]),
+        IndexModel([("created_at", DESCENDING)]),
     ])
 
 

@@ -1,16 +1,20 @@
 # app/routes/political.py
 
-import json
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 
-from app.models.schemas import MPQuoteCreate, MPActionCreate, BillVoteRequest
+from app.models.schemas import (
+    MPQuoteCreate, MPActionCreate, BillVoteRequest,
+    BillSummaryOut, BillVoteRecordOut,
+)
 from app.services.political_service import (
     sync_mps, sync_parties, sync_committees,
     get_all_mps, get_mp, get_all_parties, get_party, get_committees,
     add_quote, add_action, get_mp_quotes, get_mp_actions,
     run_contradiction_scan, get_contradictions,
     vote_on_bill, get_bill_tally,
+    sync_bills, sync_bill_votes, get_all_bills,
+    get_bill, get_bill_vote_records, get_mp_vote_records,
 )
 
 router = APIRouter(prefix="/political", tags=["Political Intelligence"])
@@ -91,6 +95,42 @@ async def party_detail(party_id: str):
 async def list_committees():
     committees = await get_committees()
     return {"total": len(committees), "committees": committees}
+
+
+@router.post("/bills/sync")
+async def sync_bills_route(limit: int = Query(50, ge=1, le=200)):
+    synced = await sync_bills(limit)
+    return {"synced": synced}
+
+
+@router.post("/bills/{bill_id}/sync-votes")
+async def sync_bill_votes_route(bill_id: str):
+    synced = await sync_bill_votes(bill_id)
+    return {"bill_id": bill_id, "mp_votes_synced": synced}
+
+
+@router.get("/bills")
+async def list_bills(limit: int = Query(50, ge=1, le=200)):
+    bills = await get_all_bills(limit)
+    return {"total": len(bills), "bills": bills}
+
+
+@router.get("/bills/{bill_id}", response_model=BillSummaryOut)
+async def bill_detail(bill_id: str):
+    bill = await get_bill(bill_id)
+    if not bill:
+        raise HTTPException(status_code=404, detail="Bill not found")
+    return bill
+
+
+@router.get("/bills/{bill_id}/votes", response_model=list[BillVoteRecordOut])
+async def bill_votes(bill_id: str):
+    return await get_bill_vote_records(bill_id)
+
+
+@router.get("/mps/{mp_id}/votes", response_model=list[BillVoteRecordOut])
+async def mp_vote_history(mp_id: str):
+    return await get_mp_vote_records(mp_id)
 
 
 @router.post("/bills/{bill_id}/vote")

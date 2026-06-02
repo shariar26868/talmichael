@@ -20,6 +20,8 @@ class Settings(BaseSettings):
 
     # OpenAI
     openai_api_key: str = ""
+    perplexity_api_key: str = ""
+    gemini_api_key: str = ""
 
     class Config:
         env_file = ".env"
