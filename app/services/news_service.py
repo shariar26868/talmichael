@@ -4,6 +4,7 @@
 import asyncio
 import httpx
 from fastapi import HTTPException
+from urllib.parse import quote
 
 from app.core.cache import cache_get, cache_set, news_key, bills_key, NEWS_TTL, BILLS_TTL
 from app.core.config import settings
@@ -15,6 +16,21 @@ from app.utils.feed_config import (
     INTERNATIONAL_SOURCES_FEEDS, ARABIC_SOURCES_FEEDS,
     get_all_feeds, get_feeds_by_language
 )
+
+
+async def knesset_api_status() -> dict:
+    """Check lightweight connectivity to the Knesset bills OData API.
+    Returned dict: {"reachable": bool, "message": str}
+    Cached at caller side if needed.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            url = KNESSET_BILLS_API.format(limit=1)
+            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            resp.raise_for_status()
+            return {"reachable": True, "message": "Knesset API reachable"}
+    except Exception as e:
+        return {"reachable": False, "message": f"Knesset API unreachable: {str(e)}"}
 
 
 async def _fetch_single_feed(url: str, source_name: str, limit: int) -> list:
@@ -192,16 +208,18 @@ async def fetch_knesset_bills(limit: int = 20) -> dict:
     cached = await cache_get(key)
     if cached:
         return cached
-
+    # Try official Knesset OData API first
     url = KNESSET_BILLS_API.format(limit=limit)
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        try:
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
             resp.raise_for_status()
             data = resp.json()
             bills = data.get("value", [])
             result = {
                 "source": "knesset.gov.il OData API",
+                "official_api_reachable": True,
+                "official_api_notice": "Connected to official Knesset OData API",
                 "total": len(bills),
                 "bills": [
                     {
@@ -216,13 +234,67 @@ async def fetch_knesset_bills(limit: int = 20) -> dict:
                     for b in bills
                 ],
             }
-        except Exception:
+    except Exception:
+        # Primary fallback: Google News RSS (keeps previous behavior)
+        try:
             news = await fetch_news("knesset", limit, israeli_only=True)
             result = {
-                "source": "Google News RSS (fallback)",
+                "source": "Google News RSS fallback",
+                "official_api_reachable": False,
+                "official_api_notice": "Official Knesset API unreachable; using Google News RSS fallback",
                 "total": news.total,
                 "articles": [a.model_dump() for a in news.articles],
             }
+        except Exception:
+            # Secondary fallback: Wikipedia search summaries
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    resp = await client.get(
+                        "https://en.wikipedia.org/w/api.php",
+                        params={
+                            "action": "query",
+                            "list": "search",
+                            "srsearch": "Knesset bills",
+                            "format": "json",
+                            "utf8": 1,
+                            "srlimit": str(limit),
+                        },
+                        headers={"User-Agent": "Mozilla/5.0"},
+                    )
+                    resp.raise_for_status()
+                    payload = resp.json()
+                    items = payload.get("query", {}).get("search", [])
+                    articles = []
+                    for it in items:
+                        title = it.get("title")
+                        # fetch summary
+                        try:
+                            sresp = await client.get(f"https://en.wikipedia.org/api/rest_v1/page/summary/{quote(title, safe='')}", headers={"User-Agent": "Mozilla/5.0"})
+                            sresp.raise_for_status()
+                            summary = sresp.json()
+                        except Exception:
+                            summary = {"extract": it.get("snippet", "")}
+                        articles.append({
+                            "title": title,
+                            "summary": summary.get("extract"),
+                            "source": "Wikipedia fallback",
+                        })
+                    result = {
+                        "source": "Wikipedia fallback",
+                        "official_api_reachable": False,
+                        "official_api_notice": "Official Knesset API unreachable; using Wikipedia fallback",
+                        "total": len(articles),
+                        "articles": articles,
+                    }
+            except Exception:
+                # Final degrade: empty response with flag
+                result = {
+                    "source": "unavailable",
+                    "official_api_reachable": False,
+                    "official_api_notice": "All sources failed to provide bill data",
+                    "total": 0,
+                    "bills": [],
+                }
 
     await cache_set(key, result, BILLS_TTL)
     return result

@@ -172,6 +172,9 @@ class BillSummaryOut(BaseModel):
     ai_summary: Optional[str] = None
     last_updated: Optional[str] = None
     source: Optional[str] = None
+    # Visible connectivity info for UI: whether official Knesset API is reachable
+    official_api_reachable: Optional[bool] = None
+    official_api_notice: Optional[str] = None
     community_tally: Optional[dict] = None
     official_vote_summary: Optional[dict] = None
     model_config = {"from_attributes": True}

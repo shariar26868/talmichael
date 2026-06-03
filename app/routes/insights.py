@@ -91,3 +91,37 @@ async def category_insight(
     articles = [a.model_dump() for a in news.articles]
 
     return await generate_category_insight(category, articles, use_ai=use_ai)
+
+
+@router.get("/subscription/summary/{period}", summary="Generate subscription summaries (weekly/monthly)")
+async def subscription_summary(period: str, limit: int = Query(8, ge=3, le=20)):
+    """Return a compact summary suitable for subscription emails.
+    period: 'weekly' or 'monthly'
+    This is a lightweight, non-AI summary that aggregates top headlines per category.
+    """
+    period = period.lower()
+    if period not in {"weekly", "monthly"}:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="period must be 'weekly' or 'monthly'")
+
+    all_news = await fetch_all_news(limit)
+    lines = []
+    total = 0
+    for cat, data in all_news.items():
+        if isinstance(data, dict) and "articles" in data:
+            articles = data["articles"][:3]
+            titles = []
+            for a in articles:
+                item = a if isinstance(a, dict) else a.model_dump()
+                titles.append(item.get("title") or item.get("name") or "(no title)")
+            if titles:
+                lines.append(f"{cat.title()}: " + " | ".join(titles))
+                total += len(titles)
+
+    summary_text = "\n".join(lines)
+    return {
+        "period": period,
+        "generated_at": __import__('datetime').datetime.utcnow().isoformat(),
+        "total_headlines": total,
+        "summary": summary_text,
+    }

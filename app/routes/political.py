@@ -16,6 +16,7 @@ from app.services.political_service import (
     sync_bills, sync_bill_votes, get_all_bills,
     get_bill, get_bill_vote_records, get_mp_vote_records,
 )
+from app.services.news_service import knesset_api_status
 
 router = APIRouter(prefix="/political", tags=["Political Intelligence"])
 
@@ -103,6 +104,13 @@ async def sync_bills_route(limit: int = Query(50, ge=1, le=200)):
     return {"synced": synced}
 
 
+@router.get("/bills/health")
+async def bills_health():
+    """Return quick health status for Knesset API reachability."""
+    status = await knesset_api_status()
+    return {"official_api_reachable": status.get("reachable", False), "notice": status.get("message")}
+
+
 @router.post("/bills/{bill_id}/sync-votes")
 async def sync_bill_votes_route(bill_id: str):
     synced = await sync_bill_votes(bill_id)
@@ -112,7 +120,8 @@ async def sync_bill_votes_route(bill_id: str):
 @router.get("/bills")
 async def list_bills(limit: int = Query(50, ge=1, le=200)):
     bills = await get_all_bills(limit)
-    return {"total": len(bills), "bills": bills}
+    status = await knesset_api_status()
+    return {"total": len(bills), "bills": bills, "official_api_reachable": status.get("reachable", False), "official_api_notice": status.get("message")}
 
 
 @router.get("/bills/{bill_id}", response_model=BillSummaryOut)
@@ -120,6 +129,9 @@ async def bill_detail(bill_id: str):
     bill = await get_bill(bill_id)
     if not bill:
         raise HTTPException(status_code=404, detail="Bill not found")
+    status = await knesset_api_status()
+    bill["official_api_reachable"] = status.get("reachable", False)
+    bill["official_api_notice"] = status.get("message")
     return bill
 
 
