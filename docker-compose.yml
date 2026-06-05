@@ -1,11 +1,8 @@
 services:
-
   mongo:
     image: mongo:7
     container_name: talmicahel-mongo
     restart: unless-stopped
-    ports:
-      - "27018:27018"
     volumes:
       - mongo_data:/data/db
     healthcheck:
@@ -39,3 +36,10 @@ services:
 
 volumes:
   mongo_data:
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.0.0/24
