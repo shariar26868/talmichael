@@ -91,6 +91,7 @@ async def get_sources(
 async def international(
     limit: int = Query(20, ge=1, le=100),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     return await fetch_news(
         "international", limit,
@@ -98,6 +99,7 @@ async def international(
         exclude_negative=True,
         language="english",
         user_tier=user_tier,
+        with_analysis=with_analysis,
     )
 
 
@@ -105,12 +107,14 @@ async def international(
 async def economy(
     limit: int = Query(20, ge=1, le=100),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     return await fetch_news(
         "economy", limit,
         israeli_only=True,
         language="english",
         user_tier=user_tier,
+        with_analysis=with_analysis,
     )
 
 
@@ -118,12 +122,14 @@ async def economy(
 async def defence(
     limit: int = Query(20, ge=1, le=100),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     return await fetch_news(
         "defence", limit,
         israeli_only=True,
         language="english",
         user_tier=user_tier,
+        with_analysis=with_analysis,
     )
 
 
@@ -131,12 +137,14 @@ async def defence(
 async def education(
     limit: int = Query(20, ge=1, le=100),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     return await fetch_news(
         "education", limit,
         israeli_only=True,
         language="english",
         user_tier=user_tier,
+        with_analysis=with_analysis,
     )
 
 
@@ -145,6 +153,7 @@ async def community(
     limit: int = Query(20, ge=1, le=100),
     exclude_negative: bool = Query(False),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     return await fetch_news(
         "community", limit,
@@ -152,6 +161,7 @@ async def community(
         exclude_negative=exclude_negative,
         language="english",
         user_tier=user_tier,
+        with_analysis=with_analysis,
     )
 
 
@@ -160,6 +170,7 @@ async def political(
     limit: int = Query(20, ge=1, le=100),
     exclude_negative: bool = Query(False),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     return await fetch_news(
         "political", limit,
@@ -167,6 +178,7 @@ async def political(
         exclude_negative=exclude_negative,
         language="english",
         user_tier=user_tier,
+        with_analysis=with_analysis,
     )
 
 
@@ -174,6 +186,7 @@ async def political(
 async def positive(
     limit: int = Query(20, ge=1, le=100),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     return await fetch_news(
         "positive", limit,
@@ -181,6 +194,7 @@ async def positive(
         exclude_negative=True,
         language="english",
         user_tier=user_tier,
+        with_analysis=with_analysis,
     )
 
 
@@ -188,12 +202,14 @@ async def positive(
 async def sport(
     limit: int = Query(20, ge=1, le=100),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     return await fetch_news(
         "sport", limit,
         israeli_only=True,
         language="english",
         user_tier=user_tier,
+        with_analysis=with_analysis,
     )
 
 
@@ -201,12 +217,14 @@ async def sport(
 async def culture(
     limit: int = Query(20, ge=1, le=100),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     return await fetch_news(
         "culture", limit,
         israeli_only=True,
         language="english",
         user_tier=user_tier,
+        with_analysis=with_analysis,
     )
 
 
@@ -214,12 +232,14 @@ async def culture(
 async def environment(
     limit: int = Query(20, ge=1, le=100),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     return await fetch_news(
         "environment", limit,
         israeli_only=True,
         language="english",
         user_tier=user_tier,
+        with_analysis=with_analysis,
     )
 
 
@@ -227,12 +247,14 @@ async def environment(
 async def science(
     limit: int = Query(20, ge=1, le=100),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     return await fetch_news(
         "science", limit,
         israeli_only=True,
         language="english",
         user_tier=user_tier,
+        with_analysis=with_analysis,
     )
 
 
@@ -245,6 +267,7 @@ async def knesset(limit: int = Query(20, ge=1, le=50)):
 async def arabic(
     limit: int = Query(20, ge=1, le=100),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     return await fetch_news(
         "arabic",
@@ -253,6 +276,7 @@ async def arabic(
         exclude_negative=False,
         language="arabic",
         user_tier=user_tier,
+        with_analysis=with_analysis,
     )
 
 
@@ -260,5 +284,6 @@ async def arabic(
 async def all_news(
     limit: int = Query(10, ge=1, le=50),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
-    return await fetch_all_news(limit, user_tier=user_tier)
+    return await fetch_all_news(limit, user_tier=user_tier, with_analysis=with_analysis)

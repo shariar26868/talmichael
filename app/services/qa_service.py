@@ -82,16 +82,19 @@ async def ask_gpt(
 
     try:
         from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=settings.openai_api_key)
+        client = AsyncOpenAI(api_key=settings.openai_api_key, timeout=10.0)
 
-        resp = await client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": question},
-            ],
-            temperature=0.3,
-            max_tokens=800,
+        resp = await asyncio.wait_for(
+            client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": question},
+                ],
+                temperature=0.3,
+                max_tokens=800,
+            ),
+            timeout=15.0,
         )
 
         answer = resp.choices[0].message.content.strip()
@@ -101,9 +104,14 @@ async def ask_gpt(
         await cache_set(cache_key, result, QA_TTL)
         return result
 
+    except asyncio.TimeoutError:
+        error_msg = "OpenAI API timeout (15s). Key may be invalid or API is unreachable. Check OPENAI_API_KEY in .env"
+        logger.error(error_msg)
+        return {"answer": error_msg, "model": model, "tokens_used": 0, "cached": False}
     except Exception as e:
-        logger.error("GPT Q&A failed: %s", e)
-        return {"answer": f"GPT error: {e}", "model": model, "tokens_used": 0, "cached": False}
+        error_str = str(e)
+        logger.error("GPT Q&A failed: %s", error_str)
+        return {"answer": f"OpenAI error: {error_str[:200]}", "model": model, "tokens_used": 0, "cached": False}
 
 
 async def ask_gpt_stream(
@@ -124,24 +132,31 @@ async def ask_gpt_stream(
 
     try:
         from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=settings.openai_api_key)
+        client = AsyncOpenAI(api_key=settings.openai_api_key, timeout=10.0)
 
-        async with client.chat.completions.stream(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": question},
-            ],
-            temperature=0.3,
-            max_tokens=800,
-        ) as stream:
-            async for chunk in stream:
-                delta = chunk.choices[0].delta.content if chunk.choices else None
-                if delta:
-                    yield delta
+        try:
+            stream = await asyncio.wait_for(
+                client.chat.completions.stream(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": question},
+                    ],
+                    temperature=0.3,
+                    max_tokens=800,
+                ),
+                timeout=15.0,
+            )
+            async with stream:
+                async for chunk in stream:
+                    delta = chunk.choices[0].delta.content if chunk.choices else None
+                    if delta:
+                        yield delta
+        except asyncio.TimeoutError:
+            yield "[OpenAI API timeout — key may be invalid or API unreachable]"
     except Exception as e:
         logger.error("GPT stream failed: %s", e)
-        yield f"[Error: {e}]"
+        yield f"[Error: {str(e)[:100]}]"
 
 
 # ── ITHY Integration ──────────────────────────────────────────────────────────
@@ -188,19 +203,22 @@ async def ask_ithy(
 
     try:
         from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=settings.openai_api_key)
+        client = AsyncOpenAI(api_key=settings.openai_api_key, timeout=10.0)
 
-        resp = await client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{
-                "role": "user",
-                "content": _ITHY_SEARCH_PROMPT.format(
-                    question=question,
-                    context=context,
-                ),
-            }],
-            temperature=0.5,
-            max_tokens=1000,
+        resp = await asyncio.wait_for(
+            client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{
+                    "role": "user",
+                    "content": _ITHY_SEARCH_PROMPT.format(
+                        question=question,
+                        context=context,
+                    ),
+                }],
+                temperature=0.5,
+                max_tokens=1000,
+            ),
+            timeout=15.0,
         )
 
         answer = resp.choices[0].message.content.strip()
@@ -208,9 +226,14 @@ async def ask_ithy(
         await cache_set(cache_key, result, QA_TTL)
         return result
 
+    except asyncio.TimeoutError:
+        error_msg = "OpenAI API timeout (15s). Key may be invalid or API is unreachable. Check OPENAI_API_KEY in .env"
+        logger.error(error_msg)
+        return {"answer": error_msg, "source": "ithy-simulated", "cached": False}
     except Exception as e:
-        logger.error("ITHY simulation failed: %s", e)
-        return {"answer": f"ITHY error: {e}", "source": "ithy-simulated", "cached": False}
+        error_str = str(e)
+        logger.error("ITHY simulation failed: %s", error_str)
+        return {"answer": f"ITHY error: {error_str[:200]}", "source": "ithy-simulated", "cached": False}
 
 
 # ── Dual AI Comparison ────────────────────────────────────────────────────────
@@ -260,19 +283,24 @@ async def _compare_answers(question: str, gpt_answer: str, ithy_answer: str) -> 
 
     try:
         from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=settings.openai_api_key)
+        client = AsyncOpenAI(api_key=settings.openai_api_key, timeout=10.0)
         prompt = (
             f"In one sentence, describe the key difference between these two answers to: '{question}'\n"
             f"Answer A: {gpt_answer[:300]}\n"
             f"Answer B: {ithy_answer[:300]}\n"
             "Respond with just the one sentence."
         )
-        resp = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-            max_tokens=100,
+        resp = await asyncio.wait_for(
+            client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=100,
+            ),
+            timeout=10.0,
         )
         return resp.choices[0].message.content.strip()
+    except asyncio.TimeoutError:
+        return "Comparison API timeout."
     except Exception:
         return "Comparison unavailable."

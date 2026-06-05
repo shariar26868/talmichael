@@ -12,6 +12,9 @@ Provides per-article:
 
 Uses OpenAI GPT-4o.  Falls back to rule-based analysis when
 OPENAI_API_KEY is not set (free-tier / dev mode).
+
+For platinum tier, the ensemble is designed to support OpenAI + Gemini + Claude.
+Claude support is reserved for later integration.
 """
 
 import asyncio
@@ -593,6 +596,19 @@ async def _gemini_analysis(
     return None
 
 
+async def _claude_analysis(
+    title: str,
+    description: str,
+    source: Optional[str],
+) -> Optional[dict]:
+    """Placeholder for future Claude analysis integration."""
+    if not settings.claude_api_key:
+        return None
+
+    logger.debug("Claude analysis requested, but Claude integration is not yet implemented.")
+    return None
+
+
 def _merge_analysis(results: list[ArticleAnalysis], guid: str) -> ArticleAnalysis:
     """Aggregate multiple ArticleAnalysis results into a single consensus output."""
     if not results:
@@ -724,6 +740,8 @@ async def analyze_article(
             tasks.append(_perplexity_analysis(title, description, source))
         if settings.gemini_api_key:
             tasks.append(_gemini_analysis(title, description, source))
+        if settings.claude_api_key:
+            tasks.append(_claude_analysis(title, description, source))
 
         responses = await asyncio.gather(*tasks, return_exceptions=True) if tasks else []
         analyses: list[ArticleAnalysis] = []

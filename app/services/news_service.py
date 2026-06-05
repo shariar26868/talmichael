@@ -58,7 +58,7 @@ async def fetch_news(
     israeli_only: bool,
     exclude_negative: bool = False,
     use_cache: bool = True,
-    with_analysis: bool = True,   # auto AI analysis on every article
+    with_analysis: bool = False,   # AI analysis disabled by default (OpenAI key issues)
     language: str = "english",   # hebrew | english | arabic
     user_tier: str = "free",
 ) -> NewsResponse:
@@ -66,7 +66,7 @@ async def fetch_news(
 
     # Cache check
     if use_cache:
-        key = news_key(category, limit, israeli_only, exclude_negative, language, user_tier)
+        key = news_key(category, limit, israeli_only, exclude_negative, language, user_tier, with_analysis)
         cached = await cache_get(key)
         if cached:
             return NewsResponse(**cached)
@@ -176,13 +176,13 @@ async def fetch_news(
                 article.bias_explanation = analysis.bias_explanation
 
     if use_cache:
-        key = news_key(category, limit, israeli_only, exclude_negative, language, user_tier)
+        key = news_key(category, limit, israeli_only, exclude_negative, language, user_tier, with_analysis)
         await cache_set(key, news.model_dump(), NEWS_TTL)
 
     return news
 
 
-async def fetch_all_news(limit: int, user_tier: str = "free") -> dict:
+async def fetch_all_news(limit: int, user_tier: str = "free", with_analysis: bool = False) -> dict:
     """Fetch all categories concurrently."""
     from app.utils.feed_config import EXCLUDE_NEGATIVE_CATEGORIES
 
@@ -192,6 +192,7 @@ async def fetch_all_news(limit: int, user_tier: str = "free") -> dict:
             israeli_only=True,
             exclude_negative=(cat in EXCLUDE_NEGATIVE_CATEGORIES),
             user_tier=user_tier,
+            with_analysis=with_analysis,
         )
         for cat in RSS_FEEDS
     ]

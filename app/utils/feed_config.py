@@ -5,126 +5,34 @@ Sources: 70+ outlets including Israeli, international, and Arabic news.
 Organized by category for better filtering and context injection.
 """
 
-# ── ISRAELI SOURCES (25+ outlets) ──────────────────────────────────────────
+# ── ISRAELI SOURCES (Primary: Google News; Fallback: Open RSS) ──────────────
 
 ISRAELI_SOURCES_FEEDS: dict[str, str] = {
-    # Major outlets
-    "Haaretz": "https://www.haaretz.com/feed",
-    "Haaretz_English": "https://www.haaretz.com/cmlink/2.271/1.3897848",
-    "Times of Israel": "https://www.timesofisrael.com/feed",
-    "Jerusalem Post": "https://www.jpost.com/rss/feeds",
-    "Ynet News": "https://www.ynet.co.il/rss/",
-    "Walla News": "https://news.walla.co.il/rss/",
-    "Kan News": "https://www.kan.org.il/rss/",
-    "Channel 12": "https://www.mako.co.il/rss",
-    "Globes": "https://www.globes.co.il/rss/",
-    "TheMarker": "https://www.themarker.com/rss",
-    
-    # Right-leaning outlets
-    "Arutz Sheva": "https://www.israelnationalnews.com/feed",
-    "Israel Hayom": "https://www.israelhayom.com/feed",
-    "The Algemeiner": "https://www.algemeiner.com/feed",
-    "Jewish Press": "https://www.jewishpress.com/feed",
-    
-    # Left-leaning outlets
-    "Meretz": "https://meretz.org.il/feed",
-    
-    # Technology & startup news
-    "CTech": "https://www.calcalistech.com/rss/",
-    "Geektime": "https://www.geektime.co.il/feed/",
-    
-    # Business & economy
-    "Business Insider Israel": "https://www.businessinsider.com.au/feed",
-    
-    # Local news outlets
-    "Yedioth Ahronoth": "https://www.ynetnews.com/rss/",
-    "Maariv": "https://www.maariv.co.il/rss/",
-    "Nrg": "https://www.nrg.co.il/rss/",
-    "Walla Politics": "https://news.walla.co.il/rss/?section=politics",
-    "Ynet Politics": "https://www.ynet.co.il/Rss/RssHebrew?channel=3",
-    
-    # Sports
-    "Sport5": "https://www.sport5.co.il/rss/",
-    "One": "https://one.co.il/rss/",
+    # PRIMARY: Google News feeds (work reliably)
+    "Google News Israel": "https://news.google.com/rss/search?q=Israel&hl=en-IL&gl=IL&ceid=IL:en",
+    "Google News Knesset": "https://news.google.com/rss/search?q=Knesset+Israel&hl=en-IL&gl=IL&ceid=IL:en",
+    "Google News Israel Politics": "https://news.google.com/rss/search?q=Israel+politics&hl=en-IL&gl=IL&ceid=IL:en",
 }
 
-# ── INTERNATIONAL SOURCES (25+ outlets) ────────────────────────────────────
+# ── INTERNATIONAL SOURCES (Primary: Google News + BBC; Fallback: Open sources) ────
 
 INTERNATIONAL_SOURCES_FEEDS: dict[str, str] = {
-    # Major news agencies
-    "Reuters": "https://www.reutersagency.com/feed/?taxonomy=best-topics&ignore_taxonomy_filter_list",
-    "AP News": "https://apnews.com/APF-Services/feed",
+    # PRIMARY: Working news feeds (Google News + BBC which allows scraping)
+    "Google News World": "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en",
+    "Google News Business": "https://news.google.com/rss/topics/CAAqJggKIiBDQklTQ2dBU0JBMU9nQXhNQXx1dW5pdmVyc2U",
     "BBC News": "https://feeds.bbci.co.uk/news/rss.xml",
     "BBC World": "https://feeds.bbci.co.uk/news/world/rss.xml",
     "BBC Middle East": "https://feeds.bbci.co.uk/news/world/middle_east/rss.xml",
-    
-    # US News
-    "CNN": "http://rss.cnn.com/rss/cnn_topstories.rss",
+    "Reuters": "https://www.reuters.com/world",  # Feed may need parsing
     "NPR": "https://feeds.npr.org/1001/rss.xml",
-    "New York Times": "https://feeds.nytimes.com/services/xml/rss/nyt/World.xml",
-    "Washington Post": "https://feeds.washingtonpost.com/rss/world",
-    "Wall Street Journal": "https://feeds.wsj.com/xml/rss/3_7085.xml",
-    
-    # UK News
-    "The Guardian": "https://www.theguardian.com/world/rss",
-    "The Telegraph": "https://www.telegraph.co.uk/feed/rss/world/index.xml",
-    "The Independent": "https://www.independent.co.uk/news/world/rss",
-    "Financial Times": "https://feeds.ft.com/world",
-    
-    # Europe
-    "Euronews": "https://www.euronews.com/feed/xml/en/news",
-    "DW News": "https://feeds.dw.com/rss/en/rss-news-en-world",
-    "France24": "https://www.france24.com/en/rss",
-    
-    # Middle East focused
-    "Al Jazeera English": "https://www.aljazeera.com/xml/rss/all.xml",
-    "Middle East Monitor": "https://www.middleeastmonitor.com/feed",
-    "Middle East Eye": "https://www.middleeasteye.net/feeds/default",
-    "Conflict Observatory": "https://www.conflictobservatory.org/feed/",
-    
-    # Asia-Pacific
-    "Reuters Asia": "https://www.reutersagency.com/feed/?taxonomy=best-topics&taxonomy_tag_id=34",
-    "The Straits Times": "https://www.straitstimes.com/feed/rss",
-    
-    # Commentary & Analysis
-    "Axios": "https://www.axios.com/feed",
-    "The Economist": "https://www.economist.com/printedition/rss.xml",
 }
 
-# ── ARABIC SOURCES (20+ outlets) ───────────────────────────────────────────
+# ── ARABIC SOURCES (Primary: Google News Arabic + BBC Arabic) ─────────────────
 
 ARABIC_SOURCES_FEEDS: dict[str, str] = {
-    # Major Arabic news agencies
+    # PRIMARY: Working sources
+    "Google News Arabic": "https://news.google.com/rss?hl=ar&gl=SA&ceid=SA:ar",
     "BBC Arabic": "https://www.bbc.com/arabic/feed.xml",
-    "Al Arabiya": "https://www.alarabiya.net/rss.xml",
-    "Sky News Arabia": "https://www.skynewsarabia.com/rss.xml",
-    "Arab News": "https://www.arabnews.com/node/feed",
-    "Al Jazeera Arabic": "https://www.aljazeera.net/xml/rss/all.xml",
-    
-    # Regional sources
-    "Middle East News Agency": "https://www.mena.org.eg/rss/",
-    "Palestine Info": "https://www.palestineinfo.info/feed/",
-    "Wafa News": "https://wafa.ps/rss",
-    
-    # Gulf sources
-    "Saudi Press Agency": "https://www.spa.gov.sa/rss",
-    "UAE News": "https://www.thenationalnews.com/rss.xml",
-    
-    # Pan-Arab outlets
-    "Ahram Online": "https://english.ahram.org.eg/NewsArchiveRss.aspx",
-    "Al Bab": "https://www.al-bab.com/feed",
-    
-    # Independent sources
-    "+972 Magazine": "https://972mag.com/feed",
-    "Local Call": "https://www.localcall.co.il/feed",
-    "Roya News": "https://royanews.tv/rss",
-    "TRT World": "https://www.trtworld.com/feed/rss.xml",
-    
-    # Turkish sources (regional)
-    "Anadolu Agency": "https://www.aa.com.tr/en/world/rss-feed",
-    "Daily Sabah": "https://www.dailysabah.com/rss/all/news",
-    "Hürriyet": "https://www.hurriyet.com.tr/rss/",
-    "Yeni Şafak": "https://www.yenisafak.com/rss/",
 }
 
 # ── CATEGORY-BASED RSS FEEDS (Fallback/supplement) ────────────────────────

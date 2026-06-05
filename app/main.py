@@ -14,6 +14,7 @@ from app.routes.political import router as political_router
 from app.routes.correlation import router as correlation_router
 from app.routes.insights import router as insights_router
 from app.routes.qa import router as qa_router
+from app.routes.health import router as health_router
 
 
 @asynccontextmanager
@@ -47,6 +48,7 @@ app.include_router(political_router)
 app.include_router(correlation_router)
 app.include_router(insights_router)
 app.include_router(qa_router)
+app.include_router(health_router)
 
 
 @app.get("/", tags=["Health"])
