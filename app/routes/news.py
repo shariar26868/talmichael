@@ -6,7 +6,8 @@ from app.services.news_service import fetch_news, fetch_all_news, fetch_knesset_
 from app.models.schemas import NewsResponse
 from app.utils.feed_config import (
     RSS_FEEDS, ISRAELI_SOURCES_FEEDS, INTERNATIONAL_SOURCES_FEEDS, 
-    ARABIC_SOURCES_FEEDS, SOURCE_REGISTRY, get_source_info, get_all_feeds
+    ARABIC_SOURCES_FEEDS, SOURCE_REGISTRY, get_source_info, get_all_feeds,
+    get_source_count,
 )
 from app.utils.filters import ISRAELI_SOURCES, BLOCKED_SOURCES
 
@@ -77,12 +78,14 @@ async def get_sources(
             "total": len(result)
         }
     else:
-        # Return simple list
+        # Return simple list with count breakdown
+        counts = get_source_count()
         return {
             "israeli_sources": sorted(ISRAELI_SOURCES_FEEDS.keys()),
             "international_sources": sorted(INTERNATIONAL_SOURCES_FEEDS.keys()),
             "arabic_sources": sorted(ARABIC_SOURCES_FEEDS.keys()),
             "total": len(sources),
+            "counts": counts,
             "blocked_sources": sorted(BLOCKED_SOURCES),
         }
 

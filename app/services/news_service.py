@@ -89,11 +89,11 @@ async def fetch_news(
     # ── Step 2: Parallel fetch from multiple sources ──────────────────────────
     
     # Limit parallel requests to avoid overwhelming servers
-    per_source_limit = max(2, limit // 5)  # Distribute limit across sources
+    per_source_limit = max(3, limit // 8)  # Distribute limit across more sources
     
     fetch_tasks = [
         _fetch_single_feed(feed_url, source_name, per_source_limit)
-        for source_name, feed_url in list(sources_to_fetch.items())[:15]  # Top 15 sources
+        for source_name, feed_url in list(sources_to_fetch.items())[:25]  # Top 25 sources
     ]
     
     results = await asyncio.gather(*fetch_tasks, return_exceptions=True)

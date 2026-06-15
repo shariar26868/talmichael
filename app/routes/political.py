@@ -250,9 +250,12 @@ async def election_2026_blocs():
     tags=["Elections 2026"],
     summary="Authoritative sources for Israeli election information",
     description=(
-        "A curated list of reliable, official sources for learning about Israeli parties, "
-        "politicians, and the 2026 election — to avoid AI misinformation. "
-        "Includes bechirot.gov.il, Knesset.gov.il, Wikipedia, and quality news outlets."
+        "22 verified, multi-language sources for Israeli election research — "
+        "covering official government bodies, Hebrew news, English news, Arabic news, "
+        "international wire agencies, think tanks, and polling aggregators. "
+        "Each source includes a bias_note so users understand editorial perspective. "
+        "Includes bechirot.gov.il, Knesset.gov.il, Reuters, AP, BBC, Al Jazeera, "
+        "Ynet, Kan, Haaretz, Israel Hayom, Times of Israel, IDI, and more."
     ),
 )
 async def election_2026_sources():
