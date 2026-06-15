@@ -1,0 +1,70 @@
+
+--- Checking kns_bill URL: https://production.oknesset.org/pipelines/data/bills/kns_bill/kns_bill.csv ---
+Status: 206
+First lines:
+  Line 1: BillID,KnessetNum,Name,SubTypeID,SubTypeDesc,PrivateNumber,CommitteeID,StatusID,Number,PostponementReasonID,PostponementReasonDesc,PublicationDate,MagazineNumber,PageNumber,IsContinuationBill,SummaryLaw,PublicationSeriesID,PublicationSeriesDesc,LastUpdatedDate,TypeID,TypeDesc,PublicationSeriesFirstCallID,PublicationSeriesFirstCallDesc
+  Line 2: 5,1,"חוק שכר חברי הכנסת, התש""ט-1949",55,ועדה,,377,118,,,,1949-06-07T00:00:00,10,41,,,6071,ספר החוקים,2022-11-17T11:08:23,2,הצעת חוק,,
+  Line 3: 20,7,"חוק מקצועות רפואיים (אגרות), התשל""א-1971",53,ממשלתית,,280,118,887,,,1971-03-05T00:00:00,618,68,,,6071,ספר החוקים,2022-06-06T14:22:16,2,הצעת חוק,460,"הצעות חוק - 887 ,מיום 16:00:00"
+  Line 4: 15752,16,"חוק רשות הספנות והנמלים, התשס""ד-2004",53,ממשלתית,,21,118,59,,,2004-07-22T00:00:00,1951,456,,,6071,ספר החוקים,2021-07-29T11:50:40,2,הצעת חוק,,
+  Line 5: 16126,16,"חוק לתיקון פקודת המשטרה (מס' 18), התשס""ד-2004",53,ממשלתית,,25,118,60,,,2004-06-30T00:00:00,1946,430,,,6071,ספר החוקים,2020-10-22T08:26:15,2,הצעת חוק,,
+  Line 6: 16127,17,"חוק להגנת חיית הבר (תיקון מס' 6), התשס""ט-2008",53,ממשלתית,,200,118,61,,,2008-11-05T00:00:00,2185,2,True,,6071,ספר החוקים,2020-08-23T15:44:29,2,הצעת חוק,,
+  Line 7: 16399,16,"חוק סדר הדין הפלילי (תיקון מס' 33) (הוראת שעה) (תיקון), התשס""ד-2004",53,ממשלתית,,25,118,62,,,2004-06-30T00:00:00,1947,432,,,6071,ספר החוקים,2020-10-22T08:26:06,2,הצעת חוק,,
+  Line 8: 16403,16,"חוק ההוצאה לפועל (תיקון מס' 24) (תיקון), התשס""ד-2003",53,ממשלתית,,25,118,63,,,2003-11-12T00:00:00,1910,16,,,6071,ספר החוקים,2020-10-22T08:25:59,2,הצעת חוק,,
+  Line 9: 16633,16,"חוק המדיניות הכלכלית לשנת הכספים 2004 (תיקוני חקיקה), התשס""ד-2004",53,ממשלתית,,21,118,64,,,2004-01-18T00:00:00,1920,70,,,6071,ספר החוקים,2026-01-20T10:36:43,2,הצעת חוק,,
+  Line 10: 16634,16,"חוק גיל פרישה, התשס""ד-2004",53,ממשלתית,,21,118,64,,,2004-01-18T00:00:00,1919,46,,,6071,ספר החוקים,2025-12-15T17:05:49,2,הצעת חוק,,
+
+--- Checking kns_faction URL: https://production.oknesset.org/pipelines/data/knesset/kns_faction/kns_faction.csv ---
+Status: 206
+First lines:
+  Line 1: Id,Name,KnessetNum,StartDate,FinishDate,IsCurrent,LastUpdatedDate
+  Line 2: 3,ישראל אחת,15,1999-06-07T00:00:00,2001-05-15T00:00:00,False,2019-01-24T11:45:06
+  Line 3: 4,הליכוד,15,1999-06-07T00:00:00,2003-02-17T00:00:00,False,2019-01-24T11:45:06
+  Line 4: 5,"ש""ס",15,1999-06-07T00:00:00,2003-02-17T00:00:00,False,2019-01-24T11:45:06
+  Line 5: 6,מרצ,15,1999-06-07T00:00:00,2003-02-17T00:00:00,False,2019-01-24T11:45:06
+  Line 6: 7,האיחוד הלאומי - ישראל ביתנו,15,2000-02-01T00:00:00,2003-02-17T00:00:00,False,2022-01-23T15:10:00
+  Line 7: 8,שינוי,15,1999-06-07T00:00:00,2003-02-17T00:00:00,False,2019-01-24T11:45:06
+  Line 8: 9,מפלגה דתית לאומית,15,1999-06-07T00:00:00,2003-02-17T00:00:00,False,2022-01-23T15:10:00
+  Line 9: 10,יהדות התורה,15,1999-06-07T00:00:00,2003-02-17T00:00:00,False,2019-01-24T11:45:06
+  Line 10: 11,ישראל בעלייה,15,1999-06-07T00:00:00,2003-02-17T00:00:00,False,2022-08-09T13:35:00
+
+--- Checking kns_person URL: https://production.oknesset.org/pipelines/data/members/kns_person/kns_person.csv ---
+Status: 206
+First lines:
+  Line 1: PersonID,LastName,FirstName,GenderID,GenderDesc,Email,IsCurrent,LastUpdatedDate
+  Line 2: 48,מלר-הורוביץ,ירדנה,250,נקבה,,False,2024-07-28T21:41:35
+  Line 3: 122,פורדס,גיורא,251,זכר,,False,2020-03-23T23:33:55
+  Line 4: 128,לב,דוד,251,זכר,,False,2020-03-23T23:40:56
+  Line 5: 134,ימין,אלינור,250,נקבה,אלינור ימין,True,2020-11-19T13:43:11
+  Line 6: 136,קפלן,רות,250,נקבה,,False,2020-03-23T23:40:27
+  Line 7: 150,"שד""ר",יצחק,251,זכר,,False,2020-03-23T23:39:50
+  Line 8: 230,אפיק,שגית,250,נקבה,shlomite@knesset.gov.il,True,2024-09-15T14:02:29
+  Line 9: 326,גריף,יוסי,251,זכר,,False,2021-11-30T13:25:49
+  Line 10: 354,אלשטיין,נורית,250,נקבה,,False,2020-03-23T23:33:15
+
+--- Checking kns_position URL: https://production.oknesset.org/pipelines/data/members/kns_position/kns_position.csv ---
+Status: 206
+First lines:
+  Line 1: PositionID,Description,GenderID,GenderDesc,LastUpdatedDate
+  Line 2: 29,יושבת–ראש הקואליציה,250,נקבה,2015-03-20T12:03:00
+  Line 3: 30,יושב–ראש הקואליציה,251,זכר,2015-03-20T12:03:00
+  Line 4: 31,משנה לראש הממשלה,252,אחר,2015-03-20T12:03:00
+  Line 5: 39,שר,251,זכר,2015-03-20T12:03:00
+  Line 6: 40,סגן שר,251,זכר,2015-03-20T12:03:00
+  Line 7: 41,"יו""ר ועדה",252,אחר,2015-03-20T12:03:00
+  Line 8: 42,חבר ועדה,251,זכר,2015-03-20T12:03:00
+  Line 9: 43,חבר הכנסת,251,זכר,2015-03-20T12:03:00
+  Line 10: 45,ראש הממשלה,252,אחר,2015-03-20T12:03:00
+
+--- Checking kns_persontoposition URL: https://production.oknesset.org/pipelines/data/members/kns_persontoposition/kns_persontoposition.csv ---
+Status: 206
+First lines:
+  Line 1: PersonToPositionID,PersonID,PositionID,KnessetNum,GovMinistryID,GovMinistryName,DutyDesc,FactionID,FactionName,GovernmentNum,CommitteeID,CommitteeName,StartDate,FinishDate,IsCurrent,LastUpdatedDate
+  Line 2: 379,2605,43,2,,,,,,,,,1951-08-20T00:00:00,1955-08-15T00:00:00,False,2015-03-20T12:03:08
+  Line 3: 380,2605,43,3,,,,,,,,,1955-08-15T00:00:00,1959-09-13T00:00:00,False,2015-03-20T12:03:08
+  Line 4: 381,2606,43,10,,,,,,,,,1983-03-22T00:00:00,1984-08-13T00:00:00,False,2015-03-20T12:03:08
+  Line 5: 382,2606,43,11,,,,,,,,,1984-08-13T00:00:00,1988-11-21T00:00:00,False,2018-11-21T17:15:40
+  Line 6: 383,2607,61,1,,,,,,,,,1949-02-14T00:00:00,1951-08-20T00:00:00,False,2015-03-20T12:03:08
+  Line 7: 384,2607,61,2,,,,,,,,,1951-08-20T00:00:00,1955-08-15T00:00:00,False,2015-03-20T12:03:08
+  Line 8: 385,2607,61,3,,,,,,,,,1955-08-15T00:00:00,1959-11-30T00:00:00,False,2015-03-20T12:03:08
+  Line 9: 386,2607,61,4,,,,,,,,,1959-11-30T00:00:00,1961-09-04T00:00:00,False,2015-03-20T12:03:08
+  Line 10: 387,2607,61,5,,,,,,,,,1961-09-04T00:00:00,1965-11-22T00:00:00,False,2015-03-20T12:03:08
