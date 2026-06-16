@@ -757,7 +757,7 @@ async def _perplexity_analysis(
                 "https://api.perplexity.ai/chat/completions",
                 headers={"Authorization": f"Bearer {settings.perplexity_api_key}"},
                 json={
-                    "model": "pplx-7b-online",
+                    "model": "sonar",  # current Perplexity model
                     "messages": [
                         {"role": "system", "content": _SYSTEM_PROMPT},
                         {"role": "user", "content": user_content},
@@ -804,7 +804,7 @@ async def _gemini_analysis(
     description: str,
     source: Optional[str],
 ) -> Optional[dict]:
-    """Call Gemini for article analysis and return a parsed JSON object."""
+    """Call Gemini via Google Generative AI API for article analysis."""
     if not settings.gemini_api_key:
         return None
 
@@ -812,29 +812,40 @@ async def _gemini_analysis(
         user_content = (
             f"Source: {source or 'Unknown'}\n"
             f"Title: {title}\n"
-            f"Description: {description[:1000]}"
+            f"Description: {description[:1000]}\n\n"
+            f"{_SYSTEM_PROMPT}\n"
+            "Respond ONLY with valid JSON."
         )
-        async with httpx.AsyncClient(timeout=20.0) as client:
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/"
+            f"models/gemini-2.0-flash:generateContent"
+            f"?key={settings.gemini_api_key}"
+        )
+        async with httpx.AsyncClient(timeout=25.0) as client:
             resp = await client.post(
-                "https://api.gemini.ai/v1/generate",
-                headers={
-                    "Authorization": f"Bearer {settings.gemini_api_key}",
-                    "Content-Type": "application/json",
-                },
+                url,
+                headers={"Content-Type": "application/json"},
                 json={
-                    "model": "gemini-1",
-                    "prompt": user_content,
-                    "max_output_tokens": 800,
-                    "temperature": 0.1,
+                    "contents": [{
+                        "parts": [{"text": user_content}]
+                    }],
+                    "generationConfig": {
+                        "temperature": 0.1,
+                        "maxOutputTokens": 1024,
+                        "responseMimeType": "application/json",
+                    },
                 },
             )
             resp.raise_for_status()
             payload = resp.json()
 
+        # Parse Gemini response structure
         content = None
-        if isinstance(payload, dict):
-            # Support multiple response shapes
-            content = payload.get("output") or payload.get("completion") or payload.get("response") or payload.get("answer")
+        candidates = payload.get("candidates", [])
+        if candidates:
+            parts = candidates[0].get("content", {}).get("parts", [])
+            if parts:
+                content = parts[0].get("text")
 
         if not content:
             return None
@@ -860,11 +871,62 @@ async def _claude_analysis(
     description: str,
     source: Optional[str],
 ) -> Optional[dict]:
-    """Placeholder for future Claude analysis integration."""
+    """Call Anthropic Claude API for article analysis."""
     if not settings.claude_api_key:
         return None
 
-    logger.debug("Claude analysis requested, but Claude integration is not yet implemented.")
+    try:
+        user_content = (
+            f"Source: {source or 'Unknown'}\n"
+            f"Title: {title}\n"
+            f"Description: {description[:1000]}\n\n"
+            f"{_SYSTEM_PROMPT}\n"
+            "Respond ONLY with valid JSON."
+        )
+        async with httpx.AsyncClient(timeout=25.0) as client:
+            resp = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": settings.claude_api_key,
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "claude-sonnet-4-20250514",
+                    "max_tokens": 1024,
+                    "messages": [
+                        {"role": "user", "content": user_content},
+                    ],
+                },
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+
+        # Parse Claude response
+        content = None
+        content_blocks = payload.get("content", [])
+        if content_blocks:
+            for block in content_blocks:
+                if block.get("type") == "text":
+                    content = block.get("text")
+                    break
+
+        if not content:
+            return None
+
+        if isinstance(content, str):
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                import re
+                match = re.search(r"\{.*\}", content, re.S)
+                if match:
+                    return json.loads(match.group(0))
+        elif isinstance(content, dict):
+            return content
+    except Exception as e:
+        logger.warning("Claude analysis failed: %s", e)
+
     return None
 
 
@@ -1042,6 +1104,50 @@ async def analyze_article(
         result.guid = guid
 
     await cache_set(cache_key, result.model_dump(), AI_TTL)
+
+    # ── Record for temporal bias tracking + audit trail (fire-and-forget) ──
+    try:
+        from app.services.bias_tracking_service import record_article_bias
+        if source:
+            await record_article_bias(
+                source_name=source,
+                article_guid=guid,
+                bias=result.bias,
+                bias_score=result.bias_score,
+                credibility_score=result.credibility_score,
+            )
+    except Exception as e:
+        logger.debug("Bias tracking failed (non-critical): %s", e)
+
+    try:
+        from app.core.database import get_db
+        from datetime import datetime
+        db = get_db()
+        models_used = ["rule-based"]
+        if tier == "pro" and settings.openai_api_key:
+            models_used = ["gpt-4o-mini", "rule-based"]
+        elif tier == "platinum":
+            models_used = [m for m, k in [
+                ("gpt-4o-mini", settings.openai_api_key),
+                ("sonar", settings.perplexity_api_key),
+                ("gemini-2.0-flash", settings.gemini_api_key),
+                ("claude-sonnet-4", settings.claude_api_key),
+            ] if k] or ["rule-based"]
+
+        await db.analysis_audit_log.insert_one({
+            "article_id": guid,
+            "timestamp": datetime.utcnow().isoformat(),
+            "models_used": models_used,
+            "analysis_tier": tier,
+            "final_bias": result.bias,
+            "final_bias_score": result.bias_score,
+            "final_credibility": result.credibility_score,
+            "consensus_source": "ai",
+            "source_name": source or "unknown",
+        })
+    except Exception as e:
+        logger.debug("Audit log failed (non-critical): %s", e)
+
     return result
 
 

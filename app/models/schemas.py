@@ -256,13 +256,87 @@ class CommitteeOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Verification & Framing Schemas ────────────────────────────────────────────
+
+class VerifiedClaim(BaseModel):
+    """A single claim extracted from an article with verification status."""
+    claim_text: str
+    verification_status: str  # verified / partially_verified / unverified / contradicted
+    evidence_sources: list[str] = []  # Source names or URLs that support/contradict
+    confidence: float = 0.5  # 0.0-1.0
+    explanation: str = ""
+
+
+class FramingAnalysis(BaseModel):
+    """Detailed analysis of how a story is framed (not just what it says)."""
+    headline_body_consistency: float = 1.0  # 0.0-1.0 (low = clickbait)
+    attribution_count: int = 0  # how many named sources cited in the article
+    perspective_balance: str = "unknown"  # "one-sided" / "balanced" / "multi-perspective"
+    narrative_frame: str = "informational"  # conflict / human_interest / economic / morality / responsibility / informational
+    voice_analysis: str = "mixed"  # "active" / "passive" / "mixed"
+    omission_signals: list[str] = []  # e.g. "no opposing view cited", "statistics without context"
+
+
+class CrossSourceMatch(BaseModel):
+    """Result of comparing the same event across multiple sources."""
+    event_cluster_id: str  # groups articles about the same event
+    matching_articles: list[dict] = []  # [{source, title, bias, guid}]
+    source_count: int = 0
+    agreement_score: float = 0.5  # 0.0-1.0 (how consistent the reporting is)
+    divergences: list[str] = []  # key differences across sources
+    consensus_framing: Optional[str] = None  # what most sources agree on
+
+
+class VerificationConfidence(BaseModel):
+    """Composite verification score combining all available signals."""
+    overall_score: float = 0.5  # 0.0-1.0
+    components: dict = {}  # breakdown: source_credibility, cross_source_agreement, etc.
+    label: str = "needs review"  # highly_verified / verified / partially_verified / needs_review / disputed
+    explanation: str = ""
+
+
+class AuditLogEntry(BaseModel):
+    """Transparency record of how an article was analyzed."""
+    article_id: str
+    timestamp: str
+    models_used: list[str] = []  # ["rule-based", "gpt-4o-mini", "gemini-2.0-flash"]
+    user_vote_count: int = 0
+    analysis_tier: str = "free"  # free / pro / platinum
+    final_bias: str = "unknown"
+    final_credibility: float = 0.5
+    consensus_source: str = "ai"  # ai / user_consensus / mixed
+
+
 # ── Voting & Credibility ──────────────────────────────────────────────────────
+
+# Full bias spectrum — granular enough for Israeli media landscape
+BIAS_SPECTRUM = (
+    "far-left", "left", "center-left", "center",
+    "center-right", "right", "far-right", "unclear",
+)
+
 
 class BiasVoteCreate(BaseModel):
     """User submits bias assessment for an article."""
-    bias_assessment: str  # "left" | "center" | "right" | "unclear"
+    bias_assessment: str  # any value from BIAS_SPECTRUM
     confidence: float     # 0.0 - 1.0
     user_notes: Optional[str] = None
+
+    @field_validator("bias_assessment")
+    @classmethod
+    def valid_bias(cls, v: str) -> str:
+        if v not in BIAS_SPECTRUM:
+            raise ValueError(
+                f"bias_assessment must be one of: {', '.join(BIAS_SPECTRUM)}"
+            )
+        return v
+
+    @field_validator("confidence")
+    @classmethod
+    def valid_confidence(cls, v: float) -> float:
+        if not (0.0 <= v <= 1.0):
+            raise ValueError("confidence must be between 0.0 and 1.0")
+        return v
 
 
 class CredibilityVoteCreate(BaseModel):
@@ -306,7 +380,7 @@ class VoteStats(BaseModel):
 
 class BiasConsensus(BaseModel):
     """Final bias assessment combining AI + user votes."""
-    bias: str  # "left" | "center" | "right" | "unknown"
+    bias: str
     confidence: float
     based_on: str  # "ai" | "user_consensus" | "mixed"
     vote_count: int

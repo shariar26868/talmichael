@@ -94,16 +94,18 @@ async def init_db() -> None:
         IndexModel([("source_name", ASCENDING)], unique=True),
     ])
 
-    # bias_votes
+    # bias_votes (with deduplication index)
     await _safe_create_indexes(db.bias_votes, [
+        IndexModel([("article_id", ASCENDING), ("user_id", ASCENDING)], unique=True),
         IndexModel([("article_id", ASCENDING)]),
         IndexModel([("user_id", ASCENDING)]),
         IndexModel([("created_at", DESCENDING)]),
         IndexModel([("helpful_count", DESCENDING)]),
     ])
 
-    # credibility_votes
+    # credibility_votes (with deduplication index)
     await _safe_create_indexes(db.credibility_votes, [
+        IndexModel([("source_name", ASCENDING), ("user_id", ASCENDING)], unique=True),
         IndexModel([("source_name", ASCENDING)]),
         IndexModel([("user_id", ASCENDING)]),
         IndexModel([("created_at", DESCENDING)]),
@@ -117,6 +119,37 @@ async def init_db() -> None:
         IndexModel([("reason", ASCENDING)]),
         IndexModel([("status", ASCENDING)]),
         IndexModel([("created_at", DESCENDING)]),
+    ])
+
+    # ── New: Verification & Fact-Check collections ────────────────────────
+
+    # cross_source_matches — event clusters with agreement scores
+    await _safe_create_indexes(db.cross_source_matches, [
+        IndexModel([("event_cluster_id", ASCENDING)], unique=True),
+        IndexModel([("matching_articles.guid", ASCENDING)]),
+        IndexModel([("updated_at", DESCENDING)]),
+    ])
+
+    # verified_claims — per-claim fact-check results
+    await _safe_create_indexes(db.verified_claims, [
+        IndexModel([("article_id", ASCENDING)]),
+        IndexModel([("verification_status", ASCENDING)]),
+    ])
+
+    # framing_analyses — article framing analysis results
+    await _safe_create_indexes(db.framing_analyses, [
+        IndexModel([("article_id", ASCENDING)], unique=True),
+    ])
+
+    # analysis_audit_log — transparency trail
+    await _safe_create_indexes(db.analysis_audit_log, [
+        IndexModel([("article_id", ASCENDING)]),
+        IndexModel([("timestamp", DESCENDING)]),
+    ])
+
+    # source_bias_history — rolling bias tracking per source
+    await _safe_create_indexes(db.source_bias_history, [
+        IndexModel([("source_name", ASCENDING), ("recorded_at", DESCENDING)]),
     ])
 
 

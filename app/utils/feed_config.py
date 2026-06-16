@@ -757,6 +757,212 @@ def get_source_info(source_name: str) -> dict:
     })
 
 
+# ── Source Ownership & Funding Transparency ───────────────────────────────────
+# Static data about who owns, funds, and controls each source.
+# Transparency score: 0.0 (opaque) – 1.0 (fully transparent).
+# This helps users evaluate potential conflicts of interest.
+
+SOURCE_OWNERSHIP_DATA: dict[str, dict] = {
+    # ── Israeli Sources ───────────────────────────────────────────────────
+    "Haaretz": {
+        "ownership": "Haaretz Group (Schocken family, ~25% + DuMont Schauberg)",
+        "funding_model": "Subscription + advertising",
+        "notable_affiliations": "Center-left editorial line, owned by Schocken family since 1937",
+        "transparency_score": 0.8,
+        "press_freedom_note": "Considered Israel's newspaper of record for liberal readership",
+    },
+    "Times of Israel": {
+        "ownership": "Times of Israel (founded by Seth Klarman backing)",
+        "funding_model": "Advertising + sponsored content + blogs",
+        "notable_affiliations": "Founded by David Horovitz (ex-Jerusalem Post editor)",
+        "transparency_score": 0.7,
+        "press_freedom_note": "English-language, broadly centrist with opinion diversity",
+    },
+    "Jerusalem Post": {
+        "ownership": "Eli Azur (acquired 2014)",
+        "funding_model": "Subscription + advertising + events",
+        "notable_affiliations": "Shifted rightward under Azur ownership",
+        "transparency_score": 0.6,
+        "press_freedom_note": "Oldest English-language daily in Israel, center-right editorial",
+    },
+    "Ynet News": {
+        "ownership": "Yedioth Ahronoth Group",
+        "funding_model": "Advertising (free online)",
+        "notable_affiliations": "Part of Yedioth Ahronoth media empire",
+        "transparency_score": 0.7,
+        "press_freedom_note": "Israel's most-visited news site",
+    },
+    "Kan News": {
+        "ownership": "Israeli Public Broadcasting Corporation (state-funded)",
+        "funding_model": "Government budget (public broadcaster)",
+        "notable_affiliations": "Replaced IBA in 2017, mandated editorial independence",
+        "transparency_score": 0.85,
+        "press_freedom_note": "Public broadcaster with legal mandate for balanced coverage",
+    },
+    "Israel Hayom": {
+        "ownership": "Miriam Adelson (Adelson family)",
+        "funding_model": "Free distribution (advertising + owner subsidy)",
+        "notable_affiliations": "Associated with Likud / PM Netanyahu, known as 'Bibiton'",
+        "transparency_score": 0.4,
+        "press_freedom_note": "Free daily with highest circulation, criticized for pro-Netanyahu bias",
+    },
+    "Arutz Sheva": {
+        "ownership": "Arutz Sheva (settler media network)",
+        "funding_model": "Donations + advertising",
+        "notable_affiliations": "Religious Zionist movement, settler community oriented",
+        "transparency_score": 0.5,
+        "press_freedom_note": "National-religious perspective, significant online following",
+    },
+    "Channel 12 (Mako)": {
+        "ownership": "Keshet Broadcasting (publicly traded)",
+        "funding_model": "Advertising + streaming subscriptions",
+        "notable_affiliations": "Israel's most-watched TV channel",
+        "transparency_score": 0.75,
+        "press_freedom_note": "Commercial broadcaster, mainstream audience",
+    },
+    "Channel 13 (Reshet)": {
+        "ownership": "Reshet Media (Len Blavatnik / Access Industries)",
+        "funding_model": "Advertising",
+        "notable_affiliations": "Owned by Ukrainian-British billionaire Blavatnik",
+        "transparency_score": 0.6,
+        "press_freedom_note": "Second-largest commercial broadcaster",
+    },
+    "i24 News": {
+        "ownership": "Patrick Drahi (Altice Group)",
+        "funding_model": "Advertising + cable/satellite distribution",
+        "notable_affiliations": "International focus, French-Israeli billionaire Drahi",
+        "transparency_score": 0.6,
+        "press_freedom_note": "Multilingual broadcaster targeting international audience",
+    },
+    "Walla News": {
+        "ownership": "Bezeq (formerly Shaul Elovitch, now Searchlight Capital)",
+        "funding_model": "Advertising",
+        "notable_affiliations": "Previously implicated in Netanyahu Case 4000",
+        "transparency_score": 0.5,
+        "press_freedom_note": "Major portal, editorial independence questioned during Elovitch era",
+    },
+    "Globes": {
+        "ownership": "Globes Group (Fishman family)",
+        "funding_model": "Subscription + advertising",
+        "notable_affiliations": "Business-focused, economically liberal",
+        "transparency_score": 0.7,
+        "press_freedom_note": "Leading business daily",
+    },
+    "TheMarker": {
+        "ownership": "Haaretz Group",
+        "funding_model": "Subscription + advertising",
+        "notable_affiliations": "Part of Haaretz Group, economic investigative journalism",
+        "transparency_score": 0.8,
+        "press_freedom_note": "Israel's leading economic newspaper",
+    },
+    "+972 Magazine": {
+        "ownership": "Independent nonprofit",
+        "funding_model": "Donations + grants (NIF, European foundations)",
+        "notable_affiliations": "Israeli-Palestinian journalist collective",
+        "transparency_score": 0.8,
+        "press_freedom_note": "Progressive independent journalism, critical of occupation",
+    },
+
+    # ── International Wire Agencies ───────────────────────────────────────
+    "Reuters": {
+        "ownership": "Thomson Reuters Corporation",
+        "funding_model": "Subscription (financial terminals) + licensing",
+        "notable_affiliations": "Largest international wire agency",
+        "transparency_score": 0.9,
+        "press_freedom_note": "Global gold standard for factual reporting",
+    },
+    "Associated Press": {
+        "ownership": "Nonprofit cooperative (member newspapers)",
+        "funding_model": "Licensing + member fees",
+        "notable_affiliations": "Nonprofit, member-owned cooperative",
+        "transparency_score": 0.95,
+        "press_freedom_note": "Founded 1846, nonprofit wire agency, highest factual reporting standards",
+    },
+    "BBC News": {
+        "ownership": "BBC (UK public broadcaster)",
+        "funding_model": "UK licence fee (public funding)",
+        "notable_affiliations": "UK government charter, mandated impartiality",
+        "transparency_score": 0.9,
+        "press_freedom_note": "World's largest public broadcaster, strict impartiality guidelines",
+    },
+
+    # ── US Sources ────────────────────────────────────────────────────────
+    "CNN World": {
+        "ownership": "Warner Bros. Discovery",
+        "funding_model": "Advertising + cable subscription",
+        "notable_affiliations": "Part of WBD media conglomerate",
+        "transparency_score": 0.7,
+        "press_freedom_note": "24-hour cable news, center-left editorial perspective",
+    },
+    "New York Times World": {
+        "ownership": "The New York Times Company (Sulzberger family)",
+        "funding_model": "Subscription + advertising",
+        "notable_affiliations": "Family-controlled since 1896",
+        "transparency_score": 0.85,
+        "press_freedom_note": "Newspaper of record, Pulitzer Prize leader",
+    },
+    "Washington Post World": {
+        "ownership": "Jeff Bezos (Nash Holdings)",
+        "funding_model": "Subscription + advertising",
+        "notable_affiliations": "Owned by Amazon founder since 2013",
+        "transparency_score": 0.75,
+        "press_freedom_note": "Major US broadsheet, known for investigative journalism",
+    },
+
+    # ── Arabic & Regional Sources ─────────────────────────────────────────
+    "Al Jazeera English": {
+        "ownership": "Qatar Foundation / Government of Qatar",
+        "funding_model": "Qatar state funding",
+        "notable_affiliations": "Qatari government funded, editorial independence debated",
+        "transparency_score": 0.5,
+        "press_freedom_note": "State-funded, criticized for Qatar bias but praised for ME coverage",
+    },
+    "Al Arabiya English": {
+        "ownership": "MBC Group (Saudi Arabia)",
+        "funding_model": "Advertising + Saudi state support",
+        "notable_affiliations": "Saudi-funded, counter to Al Jazeera editorial line",
+        "transparency_score": 0.4,
+        "press_freedom_note": "Saudi-oriented perspective on Middle East affairs",
+    },
+    "Middle East Eye": {
+        "ownership": "Middle East Eye Ltd (UK-based)",
+        "funding_model": "Donations + advertising",
+        "notable_affiliations": "Founded by former Guardian journalist, Qatar-linked funding alleged",
+        "transparency_score": 0.5,
+        "press_freedom_note": "Pro-Palestinian perspective, investigative journalism",
+    },
+    "Anadolu Agency": {
+        "ownership": "Turkish government (state-run)",
+        "funding_model": "Turkish state funding",
+        "notable_affiliations": "Turkish state news agency, government editorial control",
+        "transparency_score": 0.3,
+        "press_freedom_note": "State-run, follows Turkish government editorial line",
+    },
+    "TRT World": {
+        "ownership": "Turkish Radio and Television Corporation (state-run)",
+        "funding_model": "Turkish state funding",
+        "notable_affiliations": "Turkish government broadcaster",
+        "transparency_score": 0.3,
+        "press_freedom_note": "State broadcaster, reflects Turkish government positions",
+    },
+}
+
+
+def get_source_ownership(source_name: str) -> dict:
+    """Get ownership and funding transparency info for a source."""
+    data = SOURCE_OWNERSHIP_DATA.get(source_name)
+    if data:
+        return {"source_name": source_name, **data}
+    return {
+        "source_name": source_name,
+        "ownership": "Unknown",
+        "funding_model": "Unknown",
+        "notable_affiliations": "No data available",
+        "transparency_score": 0.0,
+        "press_freedom_note": "Ownership data not yet collected for this source.",
+    }
+
+
 def get_source_count() -> dict:
     """Return a summary of source counts by region."""
     return {
@@ -766,4 +972,6 @@ def get_source_count() -> dict:
         "category_supplementary": len(RSS_FEEDS),
         "total_feeds": len(get_all_feeds()),
         "total_registry": len(SOURCE_REGISTRY),
+        "sources_with_ownership_data": len(SOURCE_OWNERSHIP_DATA),
     }
+

@@ -18,11 +18,14 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60
     refresh_token_expire_days: int = 30
 
-    # OpenAI
+    # AI Keys (all optional — features degrade gracefully)
     openai_api_key: str = ""
     perplexity_api_key: str = ""
     gemini_api_key: str = ""
     claude_api_key: str = ""
+
+    # External fact-check APIs
+    google_factcheck_api_key: str = ""
 
     class Config:
         env_file = ".env"

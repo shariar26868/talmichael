@@ -3,20 +3,28 @@ Voting mechanism for credibility & bias validation.
 
 Crowdsources trust and bias assessments from users, combines with AI analysis
 for final consensus judgment.
+
+Features:
+  - Full bias spectrum (far-left → far-right)
+  - Vote deduplication (one vote per user per article, upsert)
+  - Rate limiting (max 30 votes per hour per user)
+  - Tier-weighted consensus (Free=1x, Pro=1.5x, Platinum=2x, Expert=3x)
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from bson import ObjectId
 
 from app.core.database import get_db
-from app.models.schemas import VoteStats, BiasConsensus, CredibilityConsensus
+from app.models.schemas import (
+    VoteStats, BiasConsensus, CredibilityConsensus, BIAS_SPECTRUM,
+)
 
 logger = logging.getLogger(__name__)
 
-# Bias assessment enum
-BIAS_TYPES = {"left", "center", "right", "unclear"}
+# Full bias spectrum — matches schemas.BIAS_SPECTRUM
+BIAS_TYPES = set(BIAS_SPECTRUM)
 
 # Credibility levels enum
 CREDIBILITY_LEVELS = {"very_low", "low", "medium", "high", "very_high"}
@@ -30,6 +38,37 @@ CREDIBILITY_SCORE_MAP = {
     "very_high": 0.95,
 }
 
+# Rate limiting
+MAX_VOTES_PER_HOUR = 30
+VOTE_COOLDOWN_SECONDS = 10
+
+
+async def _check_rate_limit(user_id: str, collection_name: str) -> None:
+    """Enforce rate limiting: max 30 votes/hour, 10s cooldown."""
+    db = get_db()
+    collection = db[collection_name]
+
+    one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+    recent_count = await collection.count_documents({
+        "user_id": user_id,
+        "created_at": {"$gte": one_hour_ago},
+    })
+    if recent_count >= MAX_VOTES_PER_HOUR:
+        raise ValueError(
+            f"Rate limit exceeded: max {MAX_VOTES_PER_HOUR} votes per hour. "
+            "Please try again later."
+        )
+
+    cooldown_threshold = datetime.utcnow() - timedelta(seconds=VOTE_COOLDOWN_SECONDS)
+    last_vote = await collection.find_one(
+        {"user_id": user_id, "created_at": {"$gte": cooldown_threshold}},
+        sort=[("created_at", -1)],
+    )
+    if last_vote:
+        raise ValueError(
+            f"Please wait {VOTE_COOLDOWN_SECONDS} seconds between votes."
+        )
+
 
 async def submit_bias_vote(
     article_id: str,
@@ -39,31 +78,63 @@ async def submit_bias_vote(
     confidence: float,
     user_notes: Optional[str] = None,
 ) -> dict:
-    """Submit user's bias assessment for an article."""
+    """Submit user's bias assessment for an article.
+
+    Upsert logic: one vote per user per article.  If the user has already
+    voted on this article their previous vote is replaced.
+    """
     db = get_db()
-    
+
     if bias_assessment not in BIAS_TYPES:
-        raise ValueError(f"Invalid bias assessment: {bias_assessment}")
-    
+        raise ValueError(
+            f"Invalid bias assessment: {bias_assessment}. "
+            f"Must be one of: {', '.join(sorted(BIAS_TYPES))}"
+        )
+
     if not (0.0 <= confidence <= 1.0):
         raise ValueError("Confidence must be between 0.0 and 1.0")
-    
-    vote = {
+
+    # Rate limiting
+    await _check_rate_limit(user_id, "bias_votes")
+
+    now = datetime.utcnow()
+    vote_doc = {
         "article_id": article_id,
         "user_id": user_id,
         "user_tier": user_tier,
         "bias_assessment": bias_assessment,
         "confidence": confidence,
         "user_notes": user_notes,
-        "created_at": datetime.utcnow(),
-        "helpful_count": 0,  # Users can upvote helpful votes
+        "created_at": now,
+        "updated_at": now,
+        "helpful_count": 0,
     }
-    
-    result = await db.bias_votes.insert_one(vote)
-    vote["_id"] = str(result.inserted_id)
-    
-    logger.info(f"Bias vote recorded: {user_id} on {article_id}")
-    return vote
+
+    # Upsert: one vote per user per article
+    result = await db.bias_votes.update_one(
+        {"article_id": article_id, "user_id": user_id},
+        {
+            "$set": {
+                "user_tier": user_tier,
+                "bias_assessment": bias_assessment,
+                "confidence": confidence,
+                "user_notes": user_notes,
+                "updated_at": now,
+            },
+            "$setOnInsert": {
+                "article_id": article_id,
+                "user_id": user_id,
+                "created_at": now,
+                "helpful_count": 0,
+            },
+        },
+        upsert=True,
+    )
+
+    vote_doc["_id"] = str(result.upserted_id or "updated")
+    action = "created" if result.upserted_id else "updated"
+    logger.info(f"Bias vote {action}: {user_id} on {article_id}")
+    return vote_doc
 
 
 async def submit_credibility_vote(
@@ -73,28 +144,56 @@ async def submit_credibility_vote(
     credibility_level: str,
     evidence: Optional[str] = None,
 ) -> dict:
-    """Submit user's credibility assessment for a source."""
+    """Submit user's credibility assessment for a source.
+
+    Upsert logic: one vote per user per source.
+    """
     db = get_db()
-    
+
     if credibility_level not in CREDIBILITY_LEVELS:
         raise ValueError(f"Invalid credibility level: {credibility_level}")
-    
-    vote = {
+
+    # Rate limiting
+    await _check_rate_limit(user_id, "credibility_votes")
+
+    now = datetime.utcnow()
+    score = CREDIBILITY_SCORE_MAP[credibility_level]
+
+    # Upsert: one vote per user per source
+    result = await db.credibility_votes.update_one(
+        {"source_name": source_name, "user_id": user_id},
+        {
+            "$set": {
+                "user_tier": user_tier,
+                "credibility_level": credibility_level,
+                "credibility_score": score,
+                "evidence": evidence,
+                "updated_at": now,
+            },
+            "$setOnInsert": {
+                "source_name": source_name,
+                "user_id": user_id,
+                "created_at": now,
+                "helpful_count": 0,
+            },
+        },
+        upsert=True,
+    )
+
+    vote_doc = {
         "source_name": source_name,
         "user_id": user_id,
         "user_tier": user_tier,
         "credibility_level": credibility_level,
-        "credibility_score": CREDIBILITY_SCORE_MAP[credibility_level],
+        "credibility_score": score,
         "evidence": evidence,
-        "created_at": datetime.utcnow(),
-        "helpful_count": 0,
+        "created_at": now,
+        "_id": str(result.upserted_id or "updated"),
     }
-    
-    result = await db.credibility_votes.insert_one(vote)
-    vote["_id"] = str(result.inserted_id)
-    
-    logger.info(f"Credibility vote recorded: {user_id} on {source_name}")
-    return vote
+
+    action = "created" if result.upserted_id else "updated"
+    logger.info(f"Credibility vote {action}: {user_id} on {source_name}")
+    return vote_doc
 
 
 async def flag_article(
@@ -153,8 +252,8 @@ async def compute_bias_consensus(article_id: str, ai_bias: str) -> BiasConsensus
     
     # Compute weighted consensus from user votes
     weighted_votes = {}
-    tier_weights = {"free": 1.0, "pro": 1.5, "platinum": 2.0}
-    
+    tier_weights = {"free": 1.0, "pro": 1.5, "platinum": 2.0, "expert": 3.0}
+
     for vote in votes:
         tier = vote.get("user_tier", "free")
         weight = tier_weights.get(tier, 1.0)
@@ -215,7 +314,7 @@ async def compute_credibility_consensus(source_name: str, ai_credibility: float)
         )
     
     # Compute weighted average from user votes
-    tier_weights = {"free": 1.0, "pro": 1.5, "platinum": 2.0}
+    tier_weights = {"free": 1.0, "pro": 1.5, "platinum": 2.0, "expert": 3.0}
     total_weight = 0.0
     weighted_sum = 0.0
     
