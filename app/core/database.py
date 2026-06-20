@@ -8,7 +8,7 @@ Collections are accessed as: db.users, db.articles, db.mps, etc.
 import logging
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo import ASCENDING, DESCENDING, IndexModel
-from pymongo.errors import OperationFailure
+from pymongo.errors import DuplicateKeyError, OperationFailure
 
 from app.core.config import settings
 
@@ -36,28 +36,30 @@ async def init_db() -> None:
         try:
             await collection.create_indexes(indexes)
         except OperationFailure as e:
-            # Code 85 is IndexOptionsConflict (e.g. index already exists with different name/options)
-            if e.code == 85:
+            # Code 85 is IndexOptionsConflict; code 86 is IndexKeySpecsConflict.
+            if e.code in (85, 86):
                 logger.warning(f"Index conflict in {collection.name}, skipping: {e}")
             else:
                 raise
+        except DuplicateKeyError as e:
+            logger.warning(f"Duplicate key index build failed in {collection.name}, skipping: {e}")
 
     # users
     await _safe_create_indexes(db.users, [
-        IndexModel([("email", ASCENDING)], unique=True),
-        IndexModel([("username", ASCENDING)], unique=True),
+        IndexModel([("email", ASCENDING)], unique=True, sparse=True, name="users_email_key"),
+        IndexModel([("username", ASCENDING)], unique=True, sparse=True, name="users_username_key"),
     ])
 
     # cached_articles
     await _safe_create_indexes(db.cached_articles, [
-        IndexModel([("guid", ASCENDING)], unique=True),
-        IndexModel([("category", ASCENDING)]),
-        IndexModel([("fetched_at", DESCENDING)]),
+        IndexModel([("guid", ASCENDING)], unique=True, name="cached_articles_guid_key"),
+        IndexModel([("category", ASCENDING)], name="cached_articles_category_key"),
+        IndexModel([("fetched_at", DESCENDING)], name="cached_articles_fetched_at_key"),
     ])
 
     # knesset_bills
     await _safe_create_indexes(db.knesset_bills, [
-        IndexModel([("bill_id", ASCENDING)], unique=True),
+        IndexModel([("bill_id", ASCENDING)], unique=True, name="knesset_bills_bill_id_key"),
     ])
 
     # bill vote records (Knesset official votes)
@@ -69,13 +71,13 @@ async def init_db() -> None:
 
     # mps
     await _safe_create_indexes(db.mps, [
-        IndexModel([("knesset_id", ASCENDING)], unique=True, sparse=True),
-        IndexModel([("name", ASCENDING)]),
+        IndexModel([("knesset_id", ASCENDING)], unique=True, sparse=True, name="mps_knesset_id_key"),
+        IndexModel([("name", ASCENDING)], name="mps_name_key"),
     ])
 
     # parties
     await _safe_create_indexes(db.parties, [
-        IndexModel([("name", ASCENDING)], unique=True),
+        IndexModel([("name", ASCENDING)], unique=True, name="parties_name_key"),
     ])
 
     # mp_quotes, mp_actions, contradictions
@@ -91,25 +93,25 @@ async def init_db() -> None:
 
     # source_credibility
     await _safe_create_indexes(db.source_credibility, [
-        IndexModel([("source_name", ASCENDING)], unique=True),
+        IndexModel([("source_name", ASCENDING)], unique=True, name="source_credibility_source_name_key"),
     ])
 
     # bias_votes (with deduplication index)
     await _safe_create_indexes(db.bias_votes, [
-        IndexModel([("article_id", ASCENDING), ("user_id", ASCENDING)], unique=True),
-        IndexModel([("article_id", ASCENDING)]),
-        IndexModel([("user_id", ASCENDING)]),
-        IndexModel([("created_at", DESCENDING)]),
-        IndexModel([("helpful_count", DESCENDING)]),
+        IndexModel([("article_id", ASCENDING), ("user_id", ASCENDING)], unique=True, name="bias_votes_article_user_key"),
+        IndexModel([("article_id", ASCENDING)], name="bias_votes_article_id_key"),
+        IndexModel([("user_id", ASCENDING)], name="bias_votes_user_id_key"),
+        IndexModel([("created_at", DESCENDING)], name="bias_votes_created_at_key"),
+        IndexModel([("helpful_count", DESCENDING)], name="bias_votes_helpful_count_key"),
     ])
 
     # credibility_votes (with deduplication index)
     await _safe_create_indexes(db.credibility_votes, [
-        IndexModel([("source_name", ASCENDING), ("user_id", ASCENDING)], unique=True),
-        IndexModel([("source_name", ASCENDING)]),
-        IndexModel([("user_id", ASCENDING)]),
-        IndexModel([("created_at", DESCENDING)]),
-        IndexModel([("helpful_count", DESCENDING)]),
+        IndexModel([("source_name", ASCENDING), ("user_id", ASCENDING)], unique=True, name="credibility_votes_source_user_key"),
+        IndexModel([("source_name", ASCENDING)], name="credibility_votes_source_name_key"),
+        IndexModel([("user_id", ASCENDING)], name="credibility_votes_user_id_key"),
+        IndexModel([("created_at", DESCENDING)], name="credibility_votes_created_at_key"),
+        IndexModel([("helpful_count", DESCENDING)], name="credibility_votes_helpful_count_key"),
     ])
 
     # article_flags

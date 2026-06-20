@@ -14,7 +14,7 @@ from app.utils.filters import is_israeli_source, is_blocked_source, is_opinion, 
 from app.utils.feed_config import (
     RSS_FEEDS, KNESSET_BILLS_API, ISRAELI_SOURCES_FEEDS, 
     INTERNATIONAL_SOURCES_FEEDS, ARABIC_SOURCES_FEEDS,
-    get_all_feeds, get_feeds_by_language
+    get_all_feeds, get_feeds_by_language, get_source_info
 )
 
 
@@ -24,9 +24,17 @@ async def knesset_api_status() -> dict:
     Cached at caller side if needed.
     """
     try:
-        async with httpx.AsyncClient(timeout=6.0) as client:
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/125.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json,text/plain,*/*;q=0.9",
+        }
+        async with httpx.AsyncClient(timeout=6.0, headers=headers, follow_redirects=True, trust_env=False) as client:
             url = KNESSET_BILLS_API.format(limit=1)
-            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            resp = await client.get(url)
             resp.raise_for_status()
             return {"reachable": True, "message": "Knesset API reachable"}
     except Exception as e:
@@ -36,8 +44,16 @@ async def knesset_api_status() -> dict:
 async def _fetch_single_feed(url: str, source_name: str, limit: int) -> list:
     """Fetch and parse a single RSS feed."""
     try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/125.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/rss+xml,application/xml,text/xml,*/*;q=0.9",
+        }
+        async with httpx.AsyncClient(timeout=8.0, headers=headers, follow_redirects=True, trust_env=False) as client:
+            resp = await client.get(url)
             resp.raise_for_status()
         news = parse_rss(resp.text, limit)
         # Tag with source
@@ -102,7 +118,12 @@ async def fetch_news(
         if isinstance(result, list):
             all_articles.extend(result)
         # Silently skip errors (already logged in _fetch_single_feed)
-    
+
+    # Fill missing source_url from configured source metadata when RSS item omitted source info.
+    for article in all_articles:
+        if not article.source_url and article.source:
+            article.source_url = get_source_info(article.source).get("url") or None
+
     # ── Step 3: Filter ────────────────────────────────────────────────────────
     
     filtered = [

@@ -22,6 +22,7 @@ class NewsArticle(BaseModel):
     pub_date: str
     source: Optional[str] = None
     source_url: Optional[str] = None
+    image_url: Optional[str] = None
     guid: Optional[str] = None
     # AI fields (populated when available)
     sentiment: Optional[str] = None
