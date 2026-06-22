@@ -4,6 +4,7 @@
 import asyncio
 import httpx
 from fastapi import HTTPException
+from typing import Literal
 from urllib.parse import quote
 
 from app.core.cache import cache_get, cache_set, news_key, bills_key, NEWS_TTL, BILLS_TTL
@@ -77,12 +78,20 @@ async def fetch_news(
     with_analysis: bool = False,   # AI analysis disabled by default (OpenAI key issues)
     language: str = "english",   # hebrew | english | arabic
     user_tier: str = "free",
+    source_type: Literal["israel", "global"] = "israel",
 ) -> NewsResponse:
     """Fetch, filter, cache, and optionally AI-analyze news from multiple sources."""
 
+    # Normalize source_type and derive israeli_only when specified.
+    source_type = source_type.lower()
+    if source_type == "israel":
+        israeli_only = True
+    elif source_type == "global":
+        israeli_only = False
+
     # Cache check
     if use_cache:
-        key = news_key(category, limit, israeli_only, exclude_negative, language, user_tier, with_analysis)
+        key = news_key(category, limit, israeli_only, exclude_negative, language, user_tier, with_analysis, source_type)
         cached = await cache_get(key)
         if cached:
             return NewsResponse(**cached)
@@ -91,7 +100,14 @@ async def fetch_news(
     
     sources_to_fetch: dict[str, str] = {}
     
-    if israeli_only:
+    if source_type == "israel":
+        sources_to_fetch = ISRAELI_SOURCES_FEEDS.copy()
+    elif source_type == "global":
+        if language.lower() == "arabic":
+            sources_to_fetch = ARABIC_SOURCES_FEEDS.copy()
+        else:
+            sources_to_fetch = INTERNATIONAL_SOURCES_FEEDS.copy()
+    elif israeli_only:
         sources_to_fetch = ISRAELI_SOURCES_FEEDS.copy()
     elif language.lower() == "hebrew":
         sources_to_fetch = ISRAELI_SOURCES_FEEDS.copy()
@@ -153,7 +169,7 @@ async def fetch_news(
     from app.utils.rss_parser import FeedMeta
     news = NewsResponse(
         meta=FeedMeta(
-            title=f"Israeli News - {category.title()}",
+            title=f"{source_type.title()} News - {category.title()}",
             description=f"Top {len(filtered)} articles from {len(sources_to_fetch)} sources",
             link="https://talmicahel.com",
             last_build_date="",

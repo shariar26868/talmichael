@@ -55,8 +55,8 @@ async def cache_delete_pattern(pattern: str) -> None:
 
 # ── Key builders ──────────────────────────────────────────────────────────────
 
-def news_key(category: str, limit: int, israeli_only: bool, exclude_negative: bool, language: str = "english", user_tier: str = "free", with_analysis: bool = False) -> str:
-    return f"news:{category}:{limit}:{int(israeli_only)}:{int(exclude_negative)}:{language.lower()}:{user_tier.lower()}:{int(with_analysis)}"
+def news_key(category: str, limit: int, israeli_only: bool, exclude_negative: bool, language: str = "english", user_tier: str = "free", with_analysis: bool = False, source_type: str = "israel") -> str:
+    return f"news:{category}:{limit}:{int(israeli_only)}:{int(exclude_negative)}:{language.lower()}:{user_tier.lower()}:{int(with_analysis)}:{source_type.lower()}"
 
 def bills_key(limit: int) -> str:
     return f"knesset:bills:{limit}"
