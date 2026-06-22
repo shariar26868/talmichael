@@ -4,7 +4,7 @@
 import asyncio
 import httpx
 from fastapi import HTTPException
-from typing import Literal
+from typing import Literal, Optional
 from urllib.parse import quote
 
 from app.core.cache import cache_get, cache_set, news_key, bills_key, NEWS_TTL, BILLS_TTL
@@ -78,20 +78,21 @@ async def fetch_news(
     with_analysis: bool = False,   # AI analysis disabled by default (OpenAI key issues)
     language: str = "english",   # hebrew | english | arabic
     user_tier: str = "free",
-    source_type: Literal["israel", "global"] = "israel",
+    source_type: Optional[Literal["israel", "global"]] = None,
 ) -> NewsResponse:
     """Fetch, filter, cache, and optionally AI-analyze news from multiple sources."""
 
-    # Normalize source_type and derive israeli_only when specified.
-    source_type = source_type.lower()
-    if source_type == "israel":
-        israeli_only = True
-    elif source_type == "global":
-        israeli_only = False
+    # Normalize source_type (if provided) and derive israeli_only when explicitly specified.
+    if source_type is not None:
+        source_type = source_type.lower()
+        if source_type == "israel":
+            israeli_only = True
+        elif source_type == "global":
+            israeli_only = False
 
-    # Cache check
+    # Cache check (do not include source_type since selection is derived from israeli_only/language)
     if use_cache:
-        key = news_key(category, limit, israeli_only, exclude_negative, language, user_tier, with_analysis, source_type)
+        key = news_key(category, limit, israeli_only, exclude_negative, language, user_tier, with_analysis)
         cached = await cache_get(key)
         if cached:
             return NewsResponse(**cached)
@@ -139,6 +140,11 @@ async def fetch_news(
     for article in all_articles:
         if not article.source_url and article.source:
             article.source_url = get_source_info(article.source).get("url") or None
+        # Set per-article source_type: 'israel' if source determined Israeli, else 'global'
+        try:
+            article.source_type = "israel" if is_israeli_source(article.source, article.source_url) else "global"
+        except Exception:
+            article.source_type = "global"
 
     # ── Step 3: Filter ────────────────────────────────────────────────────────
     
@@ -167,9 +173,10 @@ async def fetch_news(
     # ── Step 4: Create response ────────────────────────────────────────────────
     
     from app.utils.rss_parser import FeedMeta
+    display_source = source_type.title() if source_type else ("Israel" if israeli_only else "Global")
     news = NewsResponse(
         meta=FeedMeta(
-            title=f"{source_type.title()} News - {category.title()}",
+            title=f"{display_source} News - {category.title()}",
             description=f"Top {len(filtered)} articles from {len(sources_to_fetch)} sources",
             link="https://talmicahel.com",
             last_build_date="",
@@ -234,10 +241,61 @@ async def fetch_all_news(limit: int, user_tier: str = "free", with_analysis: boo
         for cat in RSS_FEEDS
     ]
     results = await asyncio.gather(*tasks, return_exceptions=True)
-    return {
-        cat: (r if not isinstance(r, Exception) else {"error": str(r)})
-        for cat, r in zip(RSS_FEEDS.keys(), results)
+    # Combine all fetched articles into a single list
+    combined = []
+    for r in results:
+        if isinstance(r, Exception):
+            continue
+        # r is a NewsResponse
+        try:
+            combined.extend(r.articles)
+        except Exception:
+            # If it's a dict (error/fallback), try to extract 'articles'
+            if isinstance(r, dict) and r.get("articles"):
+                combined.extend(r.get("articles"))
+
+    # Deduplicate by link while preserving order
+    seen = set()
+    deduped = []
+    for a in combined:
+        link = getattr(a, "link", None) or a.get("link") if isinstance(a, dict) else None
+        if not link:
+            continue
+        if link in seen:
+            continue
+        seen.add(link)
+        deduped.append(a)
+
+    # Ensure per-article `source_type` exists
+    for article in deduped:
+        try:
+            if not getattr(article, "source_type", None):
+                article.source_type = "israel" if is_israeli_source(getattr(article, "source", None), getattr(article, "source_url", None)) else "global"
+        except Exception:
+            try:
+                if isinstance(article, dict) and not article.get("source_type"):
+                    article["source_type"] = "global"
+            except Exception:
+                pass
+
+    # Limit the combined list to requested `limit`
+    final_articles = deduped[:limit]
+
+    # Build a unified NewsResponse-like dict
+    from app.utils.rss_parser import FeedMeta
+    news = {
+        "meta": {
+            "title": "All News",
+            "description": f"Combined top {len(final_articles)} articles from {len(RSS_FEEDS)} categories",
+            "link": "https://talmicahel.com",
+            "last_build_date": "",
+            "fetched_at": "",
+        },
+        "total": len(final_articles),
+        "articles": [a.model_dump() if hasattr(a, "model_dump") else a for a in final_articles],
     }
+
+    return news
 
 
 async def fetch_knesset_bills(limit: int = 20) -> dict:

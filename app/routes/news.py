@@ -93,7 +93,6 @@ async def get_sources(
 @router.get("/news/international", response_model=NewsResponse)
 async def international(
     limit: int = Query(20, ge=1, le=100),
-    source_type: str = Query("global", description="Choose source type: israel|global"),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
@@ -104,14 +103,12 @@ async def international(
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
-        source_type=source_type,
     )
 
 
 @router.get("/news/economy", response_model=NewsResponse)
 async def economy(
     limit: int = Query(20, ge=1, le=100),
-    source_type: str = Query("israel", description="Choose source type: israel|global"),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
@@ -121,14 +118,12 @@ async def economy(
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
-        source_type=source_type,
     )
 
 
 @router.get("/news/defence", response_model=NewsResponse)
 async def defence(
     limit: int = Query(20, ge=1, le=100),
-    source_type: str = Query("israel", description="Choose source type: israel|global"),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
@@ -138,14 +133,12 @@ async def defence(
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
-        source_type=source_type,
     )
 
 
 @router.get("/news/education", response_model=NewsResponse)
 async def education(
     limit: int = Query(20, ge=1, le=100),
-    source_type: str = Query("israel", description="Choose source type: israel|global"),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
@@ -155,14 +148,12 @@ async def education(
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
-        source_type=source_type,
     )
 
 
 @router.get("/news/community", response_model=NewsResponse)
 async def community(
     limit: int = Query(20, ge=1, le=100),
-    source_type: str = Query("israel", description="Choose source type: israel|global"),
     exclude_negative: bool = Query(False),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
@@ -174,14 +165,12 @@ async def community(
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
-        source_type=source_type,
     )
 
 
 @router.get("/news/political", response_model=NewsResponse)
 async def political(
     limit: int = Query(20, ge=1, le=100),
-    source_type: str = Query("israel", description="Choose source type: israel|global"),
     exclude_negative: bool = Query(False),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
@@ -193,14 +182,12 @@ async def political(
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
-        source_type=source_type,
     )
 
 
 @router.get("/news/positive", response_model=NewsResponse)
 async def positive(
     limit: int = Query(20, ge=1, le=100),
-    source_type: str = Query("israel", description="Choose source type: israel|global"),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
@@ -211,14 +198,12 @@ async def positive(
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
-        source_type=source_type,
     )
 
 
 @router.get("/news/sport", response_model=NewsResponse)
 async def sport(
     limit: int = Query(20, ge=1, le=100),
-    source_type: str = Query("israel", description="Choose source type: israel|global"),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
@@ -228,14 +213,12 @@ async def sport(
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
-        source_type=source_type,
     )
 
 
 @router.get("/news/culture", response_model=NewsResponse)
 async def culture(
     limit: int = Query(20, ge=1, le=100),
-    source_type: str = Query("israel", description="Choose source type: israel|global"),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
@@ -245,14 +228,12 @@ async def culture(
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
-        source_type=source_type,
     )
 
 
 @router.get("/news/environment", response_model=NewsResponse)
 async def environment(
     limit: int = Query(20, ge=1, le=100),
-    source_type: str = Query("israel", description="Choose source type: israel|global"),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
@@ -262,14 +243,12 @@ async def environment(
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
-        source_type=source_type,
     )
 
 
 @router.get("/news/science", response_model=NewsResponse)
 async def science(
     limit: int = Query(20, ge=1, le=100),
-    source_type: str = Query("israel", description="Choose source type: israel|global"),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
@@ -279,7 +258,6 @@ async def science(
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
-        source_type=source_type,
     )
 
 
@@ -291,7 +269,6 @@ async def knesset(limit: int = Query(20, ge=1, le=50)):
 @router.get("/news/arabic", response_model=NewsResponse)
 async def arabic(
     limit: int = Query(20, ge=1, le=100),
-    source_type: str = Query("global", description="Choose source type: israel|global"),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
@@ -303,7 +280,6 @@ async def arabic(
         language="arabic",
         user_tier=user_tier,
         with_analysis=with_analysis,
-        source_type=source_type,
     )
 
 

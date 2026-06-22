@@ -17,6 +17,7 @@ class FeedMeta(BaseModel):
 
 class NewsArticle(BaseModel):
     title: str
+    source_type: Optional[str] = None
     link: str
     description: str
     pub_date: str
