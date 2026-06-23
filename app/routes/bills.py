@@ -154,30 +154,7 @@ async def get_or_generate_bill_analysis(bill_doc: dict, run_llm: bool = False) -
 
 def get_bill_base_opinion(bill_id: str) -> dict:
     """Returns baseline public opinion counts for both mockup and real Knesset bills."""
-    base_opinions = {
-        "security-2026": {"support": 7719, "oppose": 3486, "neutral": 1245, "total": 12450},
-        "education-2026": {"support": 4014, "oppose": 3568, "neutral": 1338, "total": 8920},
-        "tax-2026": {"support": 12168, "oppose": 2340, "neutral": 1092, "total": 15600},
-        "tech-2025": {"support": 3158, "oppose": 5725, "neutral": 987, "total": 9870},
-    }
-
-    if bill_id in base_opinions:
-        return base_opinions[bill_id].copy()
-
-    # Deterministic base for other real bills to maintain visual variety
-    try:
-        val = int(bill_id)
-    except ValueError:
-        val = sum(ord(c) for c in bill_id)
-
-    total = (val % 2000) + 150
-    support_pct = (val % 40) + 30
-    oppose_pct = (val % 20) + 10
-    support = int(total * (support_pct / 100))
-    oppose = int(total * (oppose_pct / 100))
-    neutral = total - support - oppose
-
-    return {"support": support, "oppose": oppose, "neutral": neutral, "total": total}
+    return {"support": 0, "oppose": 0, "neutral": 0, "total": 0}
 
 
 def _filter_mock_bill(doc: dict, days: Optional[int]) -> bool:
