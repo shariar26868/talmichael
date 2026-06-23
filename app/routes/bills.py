@@ -414,18 +414,13 @@ async def vote_bill(
     total_neutral = base["neutral"] + db_neutral
     total_votes = total_support + total_oppose + total_neutral
 
-    # Calculate percentages summing up to exactly 100%
-    support_pct = round(total_support / total_votes * 100) if total_votes else 0
-    oppose_pct = round(total_oppose / total_votes * 100) if total_votes else 0
-    neutral_pct = max(0, 100 - support_pct - oppose_pct)
-
     return VoteResponse(
         bill_id=bill_id,
         your_vote=vote_choice,
         public_opinion=PublicOpinion(
-            support=support_pct,
-            oppose=oppose_pct,
-            neutral=neutral_pct,
+            support=total_support,
+            oppose=total_oppose,
+            neutral=total_neutral,
             total_votes=total_votes
         )
     )
