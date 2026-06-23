@@ -41,12 +41,22 @@ def _clean_xml_text(xml_text: str) -> str:
     return re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]", "", xml_text)
 
 
-def parse_rss(xml_text: str, limit: int) -> NewsResponse:
+def parse_rss(xml_data: bytes | str, limit: int) -> NewsResponse:
+    if isinstance(xml_data, bytes):
+        try:
+            xml_text = xml_data.decode("utf-8", errors="replace")
+        except Exception:
+            xml_text = str(xml_data)
+    else:
+        xml_text = xml_data
+
     try:
-        root = ET.fromstring(xml_text)
+        # Pymongo/ElementTree parses bytes better when it has encoding in header,
+        # but if we pass a string, let's encode it to utf-8 bytes
+        root = ET.fromstring(xml_text.encode("utf-8"))
     except ET.ParseError:
         clean_text = _clean_xml_text(xml_text)
-        root = ET.fromstring(clean_text)
+        root = ET.fromstring(clean_text.encode("utf-8"))
     channel = root.find("channel")
     if channel is None:
         raise ValueError("Invalid RSS feed structure")

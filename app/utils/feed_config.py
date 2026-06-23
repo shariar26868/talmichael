@@ -13,37 +13,37 @@ Last updated: 2026-06-15
 
 ISRAELI_SOURCES_FEEDS: dict[str, str] = {
     # ── Major General News ────────────────────────────────────────────────
-    "Haaretz": "https://www.haaretz.com/srv/haaretz-latest-rss",
-    "Haaretz English": "https://www.haaretz.com/srv/haaretz-latest-en-rss",
+    "Haaretz": "https://news.google.com/rss/search?q=site:haaretz.co.il&hl=he&gl=IL&ceid=IL:he",
+    "Haaretz English": "https://news.google.com/rss/search?q=site:haaretz.com&hl=en&gl=IL&ceid=IL:en",
     "Times of Israel": "https://www.timesofisrael.com/feed/",
     "Jerusalem Post": "https://www.jpost.com/rss/rssfeedsfrontpage.aspx",
-    "Ynet News": "https://www.ynetnews.com/rss/all.xml",
-    "Ynet Hebrew": "https://www.ynet.co.il/rss/news",
-    "Kan News": "https://www.kan.org.il/feed/",
-    "Israel Hayom": "https://www.israelhayom.com/feed/",
-    "Israel Hayom Hebrew": "https://www.israelhayom.co.il/feed/",
-    "Arutz Sheva": "https://www.israelnationalnews.com/rss.xml",
+    "Ynet News": "https://news.google.com/rss/search?q=site:ynetnews.com&hl=en&gl=IL&ceid=IL:en",
+    "Ynet Hebrew": "https://www.ynet.co.il/Integration/StoryRss2.xml",
+    "Kan News": "https://news.google.com/rss/search?q=site:kan.org.il&hl=he&gl=IL&ceid=IL:he",
+    "Israel Hayom": "https://news.google.com/rss/search?q=site:israelhayom.com&hl=en&gl=IL&ceid=IL:en",
+    "Israel Hayom Hebrew": "https://news.google.com/rss/search?q=site:israelhayom.co.il&hl=he&gl=IL&ceid=IL:he",
+    "Arutz Sheva": "https://news.google.com/rss/search?q=site:israelnationalnews.com&hl=en&gl=IL&ceid=IL:en",
 
     # ── Mainstream / TV ───────────────────────────────────────────────────
-    "Channel 12 (Mako)": "https://rss.mako.co.il/rssNew.xml",
-    "Channel 13 (Reshet)": "https://13tv.co.il/feed/",
-    "i24 News": "https://www.i24news.tv/en/rss",
+    "Channel 12 (Mako)": "https://news.google.com/rss/search?q=site:mako.co.il&hl=he&gl=IL&ceid=IL:he",
+    "Channel 13 (Reshet)": "https://news.google.com/rss/search?q=site:13tv.co.il&hl=he&gl=IL&ceid=IL:he",
+    "i24 News": "https://news.google.com/rss/search?q=site:i24news.tv&hl=en&gl=IL&ceid=IL:en",
     "Walla News": "https://rss.walla.co.il/feed/1",
-    "Maariv": "https://www.maariv.co.il/rss/all",
-    "Nrg (Maariv Online)": "https://www.nrg.co.il/rss/",
+    "Maariv": "https://news.google.com/rss/search?q=site:maariv.co.il&hl=he&gl=IL&ceid=IL:he",
+    "Nrg (Maariv Online)": "https://news.google.com/rss/search?q=site:maariv.co.il&hl=he&gl=IL&ceid=IL:he",
 
     # ── Business & Tech ───────────────────────────────────────────────────
     "Globes": "https://www.globes.co.il/webservice/rss/rssfeeder.asmx/FeederNode?iID=585",
-    "TheMarker": "https://www.themarker.com/srv/themarker-latest-rss",
-    "CTech (Calcalist)": "https://www.calcalistech.com/rss/all.xml",
+    "TheMarker": "https://www.themarker.com/srv/tm-all-articles",
+    "CTech (Calcalist)": "https://news.google.com/rss/search?q=site:calcalistech.com&hl=en&gl=IL&ceid=IL:en",
     "Geektime": "https://www.geektime.co.il/feed/",
-    "Calcalist": "https://www.calcalist.co.il/GeneralRss/0,16335,L-8,00.xml",
+    "Calcalist": "https://news.google.com/rss/search?q=site:calcalist.co.il&hl=he&gl=IL&ceid=IL:he",
 
     # ── Niche / Sector ────────────────────────────────────────────────────
     "The Algemeiner": "https://www.algemeiner.com/feed/",
     "Jewish Press": "https://www.jewishpress.com/feed/",
-    "Sport5": "https://www.sport5.co.il/rss/all.xml",
-    "One (Sport)": "https://www.one.co.il/rss/",
+    "Sport5": "https://news.google.com/rss/search?q=site:sport5.co.il&hl=he&gl=IL&ceid=IL:he",
+    "One (Sport)": "https://news.google.com/rss/search?q=site:one.co.il&hl=he&gl=IL&ceid=IL:he",
 
     # ── Think Tanks / Analysis (Israeli) ──────────────────────────────────
     "Israel Democracy Institute": "https://en.idi.org.il/rss",
@@ -61,8 +61,8 @@ ISRAELI_SOURCES_FEEDS: dict[str, str] = {
 
 INTERNATIONAL_SOURCES_FEEDS: dict[str, str] = {
     # ── Wire Agencies ─────────────────────────────────────────────────────
-    "Reuters": "https://www.reutersagency.com/feed/?best-topics=political-general",
-    "Associated Press": "https://rsshub.app/apnews/topics/world-news",
+    "Reuters": "https://news.google.com/rss/search?q=site:reuters.com&hl=en&gl=US&ceid=US:en",
+    "Associated Press": "https://news.google.com/rss/search?q=site:apnews.com&hl=en&gl=US&ceid=US:en",
     "AFP (Agence France-Presse)": "https://www.france24.com/en/middle-east/rss",
 
     # ── BBC ───────────────────────────────────────────────────────────────
@@ -77,9 +77,9 @@ INTERNATIONAL_SOURCES_FEEDS: dict[str, str] = {
     "NPR World": "https://feeds.npr.org/1004/rss.xml",
     "New York Times World": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
     "New York Times Middle East": "https://rss.nytimes.com/services/xml/rss/nyt/MiddleEast.xml",
-    "Washington Post World": "https://feeds.washingtonpost.com/rss/world",
+    "Washington Post World": "https://news.google.com/rss/search?q=site:washingtonpost.com&hl=en&gl=US&ceid=US:en",
     "Wall Street Journal World": "https://feeds.a.dj.com/rss/RSSWorldNews.xml",
-    "PBS NewsHour": "https://www.pbs.org/newshour/feeds/rss/world",
+    "PBS NewsHour": "https://news.google.com/rss/search?q=site:pbs.org/newshour&hl=en&gl=US&ceid=US:en",
     "Axios": "https://api.axios.com/feed/",
     "The Atlantic": "https://www.theatlantic.com/feed/all/",
     "Foreign Policy": "https://foreignpolicy.com/feed/",
@@ -88,7 +88,7 @@ INTERNATIONAL_SOURCES_FEEDS: dict[str, str] = {
     # ── United Kingdom ────────────────────────────────────────────────────
     "The Guardian World": "https://www.theguardian.com/world/rss",
     "The Guardian Middle East": "https://www.theguardian.com/world/middleeast/rss",
-    "The Telegraph World": "https://www.telegraph.co.uk/news/world/rss.xml",
+    "The Telegraph World": "https://news.google.com/rss/search?q=site:telegraph.co.uk&hl=en&gl=GB&ceid=GB:en",
     "The Independent": "https://www.independent.co.uk/news/world/rss",
     "Financial Times": "https://www.ft.com/world?format=rss",
     "The Economist": "https://www.economist.com/middle-east-and-africa/rss.xml",

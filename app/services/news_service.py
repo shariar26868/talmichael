@@ -51,12 +51,13 @@ async def _fetch_single_feed(url: str, source_name: str, limit: int) -> list:
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/125.0.0.0 Safari/537.36"
             ),
-            "Accept": "application/rss+xml,application/xml,text/xml,*/*;q=0.9",
+            "Accept": "application/rss+xml,application/xml,text/xml,application/xhtml+xml,text/html;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
         }
         async with httpx.AsyncClient(timeout=8.0, headers=headers, follow_redirects=True, trust_env=False) as client:
             resp = await client.get(url)
             resp.raise_for_status()
-        news = parse_rss(resp.text, limit)
+        news = parse_rss(resp.content, limit)
         # Tag with source
         for article in news.articles:
             if not article.source:

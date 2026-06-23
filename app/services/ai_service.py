@@ -726,7 +726,7 @@ async def _openai_analysis(
                 {"role": "user", "content": user_content},
             ],
             temperature=0.1,
-            max_tokens=400,
+            max_tokens=1500,
             response_format={"type": "json_object"},
         )
 

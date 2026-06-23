@@ -34,11 +34,30 @@ async def init_db() -> None:
 
     async def _safe_create_indexes(collection, indexes):
         try:
-            await collection.create_indexes(indexes)
+            existing_indexes = []
+            try:
+                async for idx in collection.list_indexes():
+                    existing_indexes.append(idx)
+            except Exception:
+                pass
+
+            indexes_to_create = []
+            for idx_model in indexes:
+                key_dict = dict(idx_model.document.get("key", {}))
+                conflict = False
+                for ext_idx in existing_indexes:
+                    if dict(ext_idx.get("key", {})) == key_dict:
+                        conflict = True
+                        break
+                if not conflict:
+                    indexes_to_create.append(idx_model)
+
+            if indexes_to_create:
+                await collection.create_indexes(indexes_to_create)
         except OperationFailure as e:
-            # Code 85 is IndexOptionsConflict; code 86 is IndexKeySpecsConflict.
-            if e.code in (85, 86):
-                logger.warning(f"Index conflict in {collection.name}, skipping: {e}")
+            # Code 85 is IndexOptionsConflict; code 86 is IndexKeySpecsConflict; code 11000 is DuplicateKey.
+            if e.code in (85, 86, 11000):
+                logger.warning(f"Index conflict/build failed in {collection.name}, skipping: {e}")
             else:
                 raise
         except DuplicateKeyError as e:
