@@ -173,8 +173,160 @@ async def init_db() -> None:
         IndexModel([("source_name", ASCENDING), ("recorded_at", DESCENDING)]),
     ])
 
+    # Seed mock bills for the dashboard layout
+    await _seed_mock_bills(db)
+
+
+async def _seed_mock_bills(db) -> None:
+    """Seed the 4 mockup bills if they don't already exist or need updating."""
+    from datetime import datetime
+    mock_bills = [
+        {
+            "bill_id": "security-2026",
+            "title": "National Security Enhancement Bill",
+            "name": "National Security Enhancement Bill",
+            "proposed_by": "Defense Committee",
+            "committee": "Defense Committee",
+            "date": "March 1, 2026",
+            "publication_date": "2026-03-01",
+            "status": "In Voting Stage",
+            "explanation": "This bill aims to enhance national security measures through improved coordination between security agencies and updated technology infrastructure.",
+            "key_provisions": [
+                "Enhanced inter-agency data sharing protocols",
+                "Investment in cybersecurity infrastructure (₪1.2B)",
+                "Creation of emergency response task force",
+                "Privacy oversight committee establishment"
+            ],
+            "category_tags": ["Security", "Technology"],
+            "updated_at": datetime.utcnow()
+        },
+        {
+            "bill_id": "education-2026",
+            "title": "Education System Reform Act",
+            "name": "Education System Reform Act",
+            "proposed_by": "Education Ministry",
+            "committee": "Education Ministry",
+            "date": "February 15, 2026",
+            "publication_date": "2026-02-15",
+            "status": "Committee Review",
+            "explanation": "A comprehensive reform act focusing on modernizing school curricula, increasing teacher salaries, and integrating advanced technology into classrooms.",
+            "key_provisions": [
+                "Curriculum modernization focusing on STEM",
+                "20% increase in teacher base salaries",
+                "Digital classroom transformation initiatives",
+                "Standardized testing methodology overhaul"
+            ],
+            "category_tags": ["Education", "Budget"],
+            "updated_at": datetime.utcnow()
+        },
+        {
+            "bill_id": "tax-2026",
+            "title": "Tax Reform Legislation",
+            "name": "Tax Reform Legislation",
+            "proposed_by": "Finance Committee",
+            "committee": "Finance Committee",
+            "date": "January 10, 2026",
+            "publication_date": "2026-01-10",
+            "status": "Approved",
+            "explanation": "Legislation aimed at boosting the economy by lowering corporate tax rates for tech startups while introducing tax relief brackets for middle-income households.",
+            "key_provisions": [
+                "Corporate tax reduction for certified tech startups",
+                "New income tax brackets providing middle-class relief",
+                "Streamlined online tax filing system integration",
+                "Closure of major corporate tax loopholes"
+            ],
+            "category_tags": ["Economy", "Finance"],
+            "updated_at": datetime.utcnow()
+        },
+        {
+            "bill_id": "tech-2025",
+            "title": "Technology Regulation Bill",
+            "name": "Technology Regulation Bill",
+            "proposed_by": "Innovation Committee",
+            "committee": "Innovation Committee",
+            "date": "December 5, 2025",
+            "publication_date": "2025-12-05",
+            "status": "Rejected",
+            "explanation": "A proposed regulation bill to govern artificial intelligence deployment, data privacy compliance, and impose penalties for tech firms violating user privacy.",
+            "key_provisions": [
+                "Strict licensing for high-risk AI deployments",
+                "Mandatory user data portability options",
+                "Heavy penalties for unauthorized data brokers",
+                "Establishment of an independent AI Ethics board"
+            ],
+            "category_tags": ["Technology", "Regulation"],
+            "updated_at": datetime.utcnow()
+        },
+        # ── Passed mockup bills from the last 30 days (June 2026 / late May 2026) ──
+        {
+            "bill_id": "energy-2026",
+            "title": "Renewable Energy Integration Act",
+            "name": "Renewable Energy Integration Act",
+            "proposed_by": "Infrastructure and Energy Committee",
+            "committee": "Infrastructure and Energy Committee",
+            "date": "June 10, 2026",
+            "publication_date": "2026-06-10",
+            "status": "Approved",
+            "explanation": "This bill mandates the integration of solar and wind energy sources into the national power grid, establishing subsidies for residential solar installations.",
+            "key_provisions": [
+                "Grid capacity expansion for renewable inputs",
+                "Tax credits for private solar installations",
+                "Phasing out coal-fired power stations by 2030"
+            ],
+            "category_tags": ["Energy", "Environment", "Infrastructure"],
+            "updated_at": datetime.utcnow()
+        },
+        {
+            "bill_id": "health-2026",
+            "title": "Healthcare Digitalization Law",
+            "name": "Healthcare Digitalization Law",
+            "proposed_by": "Health and Welfare Committee",
+            "committee": "Health and Welfare Committee",
+            "date": "June 3, 2026",
+            "publication_date": "2026-06-03",
+            "status": "Approved",
+            "explanation": "A law to fully digitize patient records across all public hospitals, enabling secure cross-hospital data sharing and telemedicine services.",
+            "key_provisions": [
+                "Centralized secure patient record registry",
+                "Subsidies for regional hospital tech upgrades",
+                "Strict patient data privacy standards"
+            ],
+            "category_tags": ["Health", "Technology", "Privacy"],
+            "updated_at": datetime.utcnow()
+        },
+        {
+            "bill_id": "startup-2026",
+            "title": "Startup Capital Incentive Bill",
+            "name": "Startup Capital Incentive Bill",
+            "proposed_by": "Finance Committee",
+            "committee": "Finance Committee",
+            "date": "May 28, 2026",
+            "publication_date": "2026-05-28",
+            "status": "Approved",
+            "explanation": "A bill providing tax exemptions for early-stage investments in tech startups, aimed at revitalizing capital inflows to the high-tech sector.",
+            "key_provisions": [
+                "Zero capital gains tax on investments held for 3+ years",
+                "Simplified registration for foreign venture funds",
+                "Matching grants for deep-tech research"
+            ],
+            "category_tags": ["Finance", "Economy", "Technology"],
+            "updated_at": datetime.utcnow()
+        }
+    ]
+
+    for bill in mock_bills:
+        try:
+            await db.knesset_bills.update_one(
+                {"bill_id": bill["bill_id"]},
+                {"$set": bill},
+                upsert=True
+            )
+        except Exception as e:
+            logger.warning(f"Failed to seed mock bill {bill['bill_id']}: {e}")
+
 
 async def close_db() -> None:
+
     global _client
     if _client:
         _client.close()
