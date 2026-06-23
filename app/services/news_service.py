@@ -259,7 +259,7 @@ async def fetch_all_news(limit: int, user_tier: str = "free", with_analysis: boo
     seen = set()
     deduped = []
     for a in combined:
-        link = getattr(a, "link", None) or a.get("link") if isinstance(a, dict) else None
+        link = a.get("link") if isinstance(a, dict) else getattr(a, "link", None)
         if not link:
             continue
         if link in seen:

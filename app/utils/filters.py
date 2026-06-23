@@ -35,11 +35,21 @@ ISRAELI_SOURCES: set[str] = {
     "TheMarker", "themarker.com",
     "Bizportal", "bizportal.co.il",
     "Funder", "funder.co.il",
-    "Geektime", "geektime.com",
+    "Geektime", "geektime.com", "geektime.co.il",
     "IVC", "ivc-online.com",
     "Israel Ministry of Foreign Affairs", "mfa.gov.il",
     "Knesset", "knesset.gov.il",
     "Israel Government Press Office", "gov.il",
+    "Haaretz English",
+    "Ynet Hebrew",
+    "Israel Hayom Hebrew",
+    "Channel 12 (Mako)",
+    "Channel 13 (Reshet)",
+    "Nrg (Maariv Online)",
+    "CTech (Calcalist)",
+    "Jewish Press",
+    "One (Sport)",
+    "Sport5",
 }
 
 BLOCKED_SOURCES: set[str] = {
