@@ -31,7 +31,6 @@ class BillOut(BaseModel):
     title: str
     proposed_by: str
     date: str
-    status: str
     explanation: Optional[str] = None
     key_provisions: Optional[List[str]] = None
     category_tags: List[str]
@@ -72,12 +71,12 @@ Bill Hebrew Summary: {summary}
 Bill Type: {type}
 
 Respond ONLY with a JSON object in this format:
-{{
+{
   "title_en": "Standard English Title",
   "explanation": "Clear explanation of the bill...",
   "key_provisions": ["Provision 1...", "Provision 2..."],
   "category_tags": ["Tag1", "Tag2"]
-}}
+}
 """
 
 
@@ -181,24 +180,8 @@ def get_bill_base_opinion(bill_id: str) -> dict:
     return {"support": support, "oppose": oppose, "neutral": neutral, "total": total}
 
 
-def _filter_mock_bill(doc: dict, status: Optional[str], days: Optional[int]) -> bool:
-    """Helper to filter mockup bills in memory based on status and age in days."""
-    if status:
-        status_lower = status.lower()
-        doc_status = (doc.get("status") or "").lower()
-        if status_lower in ("passed", "approved"):
-            if doc_status not in ("approved", "enacted – became law"):
-                return False
-        elif status_lower == "voting":
-            if doc_status != "in voting stage":
-                return False
-        elif status_lower == "review":
-            if doc_status != "committee review":
-                return False
-        else:
-            if status_lower not in doc_status:
-                return False
-
+def _filter_mock_bill(doc: dict, days: Optional[int]) -> bool:
+    """Helper to filter mockup bills in memory based on age in days."""
     if days:
         pub_date_str = doc.get("publication_date")
         if not pub_date_str:
@@ -221,7 +204,6 @@ def _filter_mock_bill(doc: dict, status: Optional[str], days: Optional[int]) -> 
 
 @router.get("/bills", response_model=BillsListResponse)
 async def list_bills(
-    status: Optional[str] = Query(None, description="Filter by status: passed | approved | voting | review"),
     days: Optional[int] = Query(None, description="Filter by last updated days, e.g. 30"),
     user_tier: str = Query("free", description="User tier: free | pro"),
     with_analysis: bool = Query(False, description="Whether to include AI analysis"),
@@ -240,7 +222,7 @@ async def list_bills(
     mock_docs = await mock_cursor.to_list(length=20)
 
     # Filter mock bills in-memory
-    filtered_mock_docs = [doc for doc in mock_docs if _filter_mock_bill(doc, status, days)]
+    filtered_mock_docs = [doc for doc in mock_docs if _filter_mock_bill(doc, days)]
 
     # Sort mock bills in layout order
     mock_order = {
@@ -252,20 +234,6 @@ async def list_bills(
     # 2. Build MongoDB query for real Knesset bills
     real_query = {"bill_id": {"$nin": mock_ids}}
 
-    if status:
-        status_lower = status.lower()
-        if status_lower in ("passed", "approved"):
-            real_query["$or"] = [
-                {"status": {"$in": ["Approved", "Enacted – became law"]}},
-                {"status_id": {"$in": ["120", "162"]}}
-            ]
-        elif status_lower == "voting":
-            real_query["status"] = "In Voting Stage"
-        elif status_lower == "review":
-            real_query["status"] = "Committee Review"
-        else:
-            real_query["status"] = status
-
     if days:
         cutoff_date = datetime.utcnow() - timedelta(days=days)
         cutoff_str = cutoff_date.isoformat()
@@ -274,13 +242,7 @@ async def list_bills(
             {"last_updated": {"$gte": cutoff_str}},
             {"publication_date": {"$gte": cutoff_str.split("T")[0]}}
         ]
-        if "$or" in real_query:
-            real_query["$and"] = [
-                {"$or": real_query.pop("$or")},
-                {"$or": date_filters}
-            ]
-        else:
-            real_query["$or"] = date_filters
+        real_query["$or"] = date_filters
 
     real_cursor = db.knesset_bills.find(real_query).sort("last_updated", -1)
     real_docs = await real_cursor.to_list(length=50)
@@ -313,7 +275,6 @@ async def list_bills(
         # Determine proposed_by / date
         proposed_by = doc.get("proposed_by") or doc.get("committee") or doc.get("initiator") or "Knesset Committee"
         date = doc.get("date") or doc.get("publication_date") or doc.get("last_updated") or "Unknown"
-        status = doc.get("status") or "Unknown"
 
         # Determine category tags
         category_tags = doc.get("category_tags") or []
@@ -341,7 +302,6 @@ async def list_bills(
                 title=title,
                 proposed_by=proposed_by,
                 date=date,
-                status=status,
                 explanation=explanation,
                 key_provisions=key_provisions,
                 category_tags=category_tags

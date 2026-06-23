@@ -114,19 +114,19 @@ async def test_bills_flow():
         print("PASS: Nonexistent bill correctly returns 404 Not Found.")
 
         print("\n" + "="*60)
-        print("TEST 5: GET /bills?status=passed&days=30 (Date-wise Passed Bills)")
+        print("TEST 5: GET /bills?days=30 (Date-wise Bills)")
         print("="*60)
-        # Filters: status=passed (or approved), days=30 (last 30 days)
-        # Should return exactly our 3 passed mock bills: energy-2026, health-2026, startup-2026
-        resp = await client.get("/bills?status=passed&days=30&user_tier=pro&with_analysis=true")
+        # Filters: days=30 (last 30 days)
+        # Should return exactly our mock bills within 30 days: energy-2026, health-2026, startup-2026, security-2026 (seeding date is March 1, 2026 - wait! March 1 is more than 30 days. So only energy, health, startup)
+        resp = await client.get("/bills?days=30&user_tier=pro&with_analysis=true")
         assert resp.status_code == 200
         data = resp.json()
-        print(f"Total passed bills in last 30 days: {len(data['bills'])}")
+        print(f"Total bills in last 30 days: {len(data['bills'])}")
         
         returned_ids = [b["bill_id"] for b in data["bills"]]
         print(f"Returned bill IDs: {returned_ids}")
         
-        # Verify exactly the 3 mock passed bills are present
+        # Verify exactly the mock bills within 30 days are present
         assert "energy-2026" in returned_ids
         assert "health-2026" in returned_ids
         assert "startup-2026" in returned_ids
@@ -139,7 +139,7 @@ async def test_bills_flow():
         assert "mandates the integration of solar and wind" in energy_bill["explanation"]
         assert len(energy_bill["key_provisions"]) == 3
         
-        print("PASS: Date-wise filtering for passed bills works perfectly and returns full AI explanations.")
+        print("PASS: Date-wise filtering for bills works perfectly and returns full AI explanations.")
 
     await close_db()
 
