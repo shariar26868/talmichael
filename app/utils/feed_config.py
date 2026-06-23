@@ -190,6 +190,119 @@ RSS_FEEDS: dict[str, str] = {
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
+# TOPIC-SPECIFIC MIXED FEEDS (Israel + Global per category)
+# Each topic has BOTH Israel-focused AND global/world RSS feeds.
+# These are fetched together to produce a mixed Israel+Global result.
+# Topic keyword filtering (in filters.py) ensures relevance is maintained.
+# ══════════════════════════════════════════════════════════════════════════════
+
+TOPIC_MIXED_FEEDS: dict[str, dict[str, str]] = {
+    "political": {
+        # ── Israel political ──────────────────────────────────────────────
+        "Google News IL Political": "https://news.google.com/rss/search?q=Israel+politics+Knesset+Netanyahu+government&hl=en-IL&gl=IL&ceid=IL:en",
+        "Google News IL Hebrew Political": "https://news.google.com/rss/search?q=ממשלה+כנסת+פוליטיקה&hl=he-IL&gl=IL&ceid=IL:he",
+        # ── Global political ──────────────────────────────────────────────
+        "Google News World Political": "https://news.google.com/rss/search?q=world+politics+government+election+parliament&hl=en-US&gl=US&ceid=US:en",
+        "Google News US Politics": "https://news.google.com/rss/topics/CAAqIQgKIhtDQkFTRGdvSUwyMHZNRFZxYUdjU0FtVnVLQUFQAQ?hl=en-US&gl=US&ceid=US:en",
+        "Google News Middle East Political": "https://news.google.com/rss/search?q=Middle+East+politics+diplomacy+government&hl=en-US&gl=US&ceid=US:en",
+    },
+    "economy": {
+        # ── Israel economy ────────────────────────────────────────────────
+        "Google News IL Economy": "https://news.google.com/rss/search?q=Israel+economy+GDP+shekel+finance+business&hl=en-IL&gl=IL&ceid=IL:en",
+        "Google News IL Business": "https://news.google.com/rss/search?q=ישראל+כלכלה+עסקים+שוק&hl=he-IL&gl=IL&ceid=IL:he",
+        # ── Global economy ────────────────────────────────────────────────
+        "Google News World Business": "https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx6TVdZU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US:en",
+        "Google News Global Markets": "https://news.google.com/rss/search?q=global+economy+stock+market+trade+inflation&hl=en-US&gl=US&ceid=US:en",
+        "Google News Finance": "https://news.google.com/rss/search?q=world+finance+investment+GDP+recession&hl=en-US&gl=US&ceid=US:en",
+    },
+    "defence": {
+        # ── Israel defence ────────────────────────────────────────────────
+        "Google News IL Defence": "https://news.google.com/rss/search?q=Israel+IDF+military+security+Gaza+Hamas&hl=en-IL&gl=IL&ceid=IL:en",
+        "Google News IL Security": "https://news.google.com/rss/search?q=ישראל+צבא+ביטחון+IDF&hl=he-IL&gl=IL&ceid=IL:he",
+        # ── Global defence ────────────────────────────────────────────────
+        "Google News World Defence": "https://news.google.com/rss/search?q=world+military+defense+war+conflict+NATO&hl=en-US&gl=US&ceid=US:en",
+        "Google News Middle East Security": "https://news.google.com/rss/search?q=Middle+East+military+conflict+security+Iran&hl=en-US&gl=US&ceid=US:en",
+        "Google News Global Military": "https://news.google.com/rss/search?q=global+army+weapons+armed+forces+warfare&hl=en-US&gl=US&ceid=US:en",
+    },
+    "education": {
+        # ── Israel education ──────────────────────────────────────────────
+        "Google News IL Education": "https://news.google.com/rss/search?q=Israel+education+university+school+students&hl=en-IL&gl=IL&ceid=IL:en",
+        "Google News IL School": "https://news.google.com/rss/search?q=ישראל+חינוך+אוניברסיטה+בית+ספר&hl=he-IL&gl=IL&ceid=IL:he",
+        # ── Global education ──────────────────────────────────────────────
+        "Google News World Education": "https://news.google.com/rss/search?q=world+education+university+school+students+learning&hl=en-US&gl=US&ceid=US:en",
+        "Google News Global Higher Ed": "https://news.google.com/rss/search?q=global+higher+education+research+academic&hl=en-US&gl=US&ceid=US:en",
+    },
+    "community": {
+        # ── Israel community ──────────────────────────────────────────────
+        "Google News IL Society": "https://news.google.com/rss/search?q=Israel+society+community+social+welfare&hl=en-IL&gl=IL&ceid=IL:en",
+        "Google News IL Hebrew Society": "https://news.google.com/rss/search?q=ישראל+חברה+קהילה+רווחה&hl=he-IL&gl=IL&ceid=IL:he",
+        # ── Global community/society ──────────────────────────────────────
+        "Google News World Society": "https://news.google.com/rss/search?q=world+society+community+human+rights+social&hl=en-US&gl=US&ceid=US:en",
+        "Google News Global Welfare": "https://news.google.com/rss/search?q=global+social+welfare+community+nonprofit&hl=en-US&gl=US&ceid=US:en",
+    },
+    "sport": {
+        # ── Israel sport ──────────────────────────────────────────────────
+        "Google News IL Sport": "https://news.google.com/rss/search?q=Israel+sport+football+basketball+Maccabi&hl=en-IL&gl=IL&ceid=IL:en",
+        "Google News IL Hebrew Sport": "https://news.google.com/rss/search?q=ספורט+ישראל+כדורגל+כדורסל+מכבי&hl=he-IL&gl=IL&ceid=IL:he",
+        # ── Global sport ──────────────────────────────────────────────────
+        "Google News World Sport": "https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRFp1ZGpZU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US:en",
+        "Google News Global Football": "https://news.google.com/rss/search?q=world+football+soccer+FIFA+Premier+League+Champions+League&hl=en-US&gl=US&ceid=US:en",
+        "Google News Global Basketball": "https://news.google.com/rss/search?q=NBA+basketball+EuroLeague+sport+championship&hl=en-US&gl=US&ceid=US:en",
+        "Google News Olympics": "https://news.google.com/rss/search?q=Olympics+athletics+world+championship+sport&hl=en-US&gl=US&ceid=US:en",
+    },
+    "culture": {
+        # ── Israel culture ────────────────────────────────────────────────
+        "Google News IL Culture": "https://news.google.com/rss/search?q=Israel+culture+art+music+film+theater&hl=en-IL&gl=IL&ceid=IL:en",
+        "Google News IL Hebrew Culture": "https://news.google.com/rss/search?q=ישראל+תרבות+אמנות+מוזיקה+קולנוע&hl=he-IL&gl=IL&ceid=IL:he",
+        # ── Global culture ────────────────────────────────────────────────
+        "Google News World Entertainment": "https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRFp0WldZU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US:en",
+        "Google News Global Culture": "https://news.google.com/rss/search?q=world+culture+art+music+film+festival+exhibition&hl=en-US&gl=US&ceid=US:en",
+    },
+    "environment": {
+        # ── Israel environment ────────────────────────────────────────────
+        "Google News IL Environment": "https://news.google.com/rss/search?q=Israel+environment+climate+energy+sustainability&hl=en-IL&gl=IL&ceid=IL:en",
+        "Google News IL Climate": "https://news.google.com/rss/search?q=ישראל+סביבה+אקלים+אנרגיה&hl=he-IL&gl=IL&ceid=IL:he",
+        # ── Global environment ────────────────────────────────────────────
+        "Google News World Climate": "https://news.google.com/rss/search?q=climate+change+global+warming+environment+sustainability&hl=en-US&gl=US&ceid=US:en",
+        "Google News Global Green": "https://news.google.com/rss/search?q=renewable+energy+solar+wind+carbon+emissions+COP&hl=en-US&gl=US&ceid=US:en",
+    },
+    "science": {
+        # ── Israel science/tech ───────────────────────────────────────────
+        "Google News IL Science": "https://news.google.com/rss/search?q=Israel+science+technology+innovation+AI+startup&hl=en-IL&gl=IL&ceid=IL:en",
+        "Google News IL Tech": "https://news.google.com/rss/search?q=ישראל+טכנולוגיה+מדע+סייבר+AI&hl=he-IL&gl=IL&ceid=IL:he",
+        # ── Global science/tech ───────────────────────────────────────────
+        "Google News World Tech": "https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US:en",
+        "Google News Global AI": "https://news.google.com/rss/search?q=artificial+intelligence+AI+technology+innovation+research&hl=en-US&gl=US&ceid=US:en",
+        "Google News Global Science": "https://news.google.com/rss/search?q=science+discovery+space+medicine+research+breakthrough&hl=en-US&gl=US&ceid=US:en",
+    },
+    "positive": {
+        # ── Israel positive ───────────────────────────────────────────────
+        "Google News IL Positive": "https://news.google.com/rss/search?q=Israel+achievement+success+award+innovation+breakthrough&hl=en-IL&gl=IL&ceid=IL:en",
+        # ── Global positive ───────────────────────────────────────────────
+        "Google News World Positive": "https://news.google.com/rss/search?q=world+achievement+success+breakthrough+hero+peace+cooperation&hl=en-US&gl=US&ceid=US:en",
+        "Google News Global Hope": "https://news.google.com/rss/search?q=global+positive+news+solution+innovation+milestone&hl=en-US&gl=US&ceid=US:en",
+    },
+    "international": {
+        # ── Israel international ──────────────────────────────────────────
+        "Google News IL International": "https://news.google.com/rss/search?q=Israel+international+relations+diplomacy+UN&hl=en-IL&gl=IL&ceid=IL:en",
+        # ── Global international ──────────────────────────────────────────
+        "Google News World": "https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx1YlY4U0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US:en",
+        "Google News Global Affairs": "https://news.google.com/rss/search?q=international+affairs+UN+NATO+EU+G7+diplomacy&hl=en-US&gl=US&ceid=US:en",
+        "Google News Middle East": "https://news.google.com/rss/search?q=Middle+East+international+relations+crisis+diplomacy&hl=en-US&gl=US&ceid=US:en",
+    },
+    "knesset": {
+        # ── Knesset / Israeli parliament ──────────────────────────────────
+        "Google News Knesset": "https://news.google.com/rss/search?q=Knesset+Israeli+parliament+legislation+bill+law&hl=en-IL&gl=IL&ceid=IL:en",
+        "Google News Knesset Hebrew": "https://news.google.com/rss/search?q=כנסת+חקיקה+הצעת+חוק+ממשלה&hl=he-IL&gl=IL&ceid=IL:he",
+        # ── Global parliament news ────────────────────────────────────────
+        "Google News World Parliament": "https://news.google.com/rss/search?q=parliament+legislature+legislation+law+global&hl=en-US&gl=US&ceid=US:en",
+    },
+    "arabic": {
+        # ── Arabic feeds use dedicated Arabic sources (see ARABIC_SOURCES_FEEDS) ──
+    },
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
 # SOURCE REGISTRY — Full metadata for every source
 # Each entry: url, country, language, bias, credibility, category
 # ══════════════════════════════════════════════════════════════════════════════

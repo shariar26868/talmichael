@@ -1,25 +1,34 @@
 # app/routes/news.py
+"""News API routes — every endpoint returns mixed Israel + Global content."""
 
 from typing import Optional
 from fastapi import APIRouter, Query
 from app.services.news_service import fetch_news, fetch_all_news, fetch_knesset_bills
 from app.models.schemas import NewsResponse
 from app.utils.feed_config import (
-    RSS_FEEDS, ISRAELI_SOURCES_FEEDS, INTERNATIONAL_SOURCES_FEEDS, 
-    ARABIC_SOURCES_FEEDS, SOURCE_REGISTRY, get_source_info, get_all_feeds,
-    get_source_count,
+    RSS_FEEDS, TOPIC_MIXED_FEEDS, ISRAELI_SOURCES_FEEDS,
+    INTERNATIONAL_SOURCES_FEEDS, ARABIC_SOURCES_FEEDS,
+    SOURCE_REGISTRY, get_source_info, get_all_feeds, get_source_count,
 )
-from app.utils.filters import ISRAELI_SOURCES, BLOCKED_SOURCES
+from app.utils.filters import ISRAELI_SOURCES, BLOCKED_SOURCES, TOPIC_KEYWORDS
 
 router = APIRouter(tags=["News"])
 
 
 @router.get("/categories")
 async def get_categories():
-    """Get all news categories."""
+    """Get all news categories with topic keyword info."""
     return {
         "categories": list(RSS_FEEDS.keys()),
-        "count": len(RSS_FEEDS)
+        "count": len(RSS_FEEDS),
+        "note": "All categories return MIXED Israel + Global articles. Topic keywords ensure relevance.",
+        "topic_keywords": {
+            cat: {
+                "required_sample": config.get("required", [])[:5],
+                "excluded_sample": config.get("excluded", [])[:3],
+            }
+            for cat, config in TOPIC_KEYWORDS.items()
+        },
     }
 
 
@@ -27,17 +36,17 @@ async def get_categories():
 async def get_sources(
     language: Optional[str] = Query(None, description="Filter by language: hebrew|english|arabic"),
     country: Optional[str] = Query(None, description="Filter by country"),
-    detailed: bool = Query(False, description="Include source metadata")
+    detailed: bool = Query(False, description="Include source metadata"),
 ):
     """
     Get available news sources.
-    
+
     - language: Filter by language (hebrew, english, arabic)
     - country: Filter by country (Israel, UK, USA, etc.)
     - detailed: Include full metadata (bias, credibility, etc.)
     """
     sources = {}
-    
+
     if language:
         lang = language.lower()
         if lang in ["hebrew", "he", "iw"]:
@@ -48,8 +57,7 @@ async def get_sources(
             sources = ARABIC_SOURCES_FEEDS.copy()
     else:
         sources = get_all_feeds()
-    
-    # Filter by country if specified
+
     if country:
         filtered_sources = {}
         for name, url in sources.items():
@@ -57,9 +65,8 @@ async def get_sources(
             if info.get("country", "").lower() == country.lower():
                 filtered_sources[name] = url
         sources = filtered_sources
-    
+
     if detailed:
-        # Return with metadata
         result = []
         for name, url in sources.items():
             info = get_source_info(name)
@@ -71,14 +78,13 @@ async def get_sources(
                 "language": info.get("language", "Unknown"),
                 "bias": info.get("bias", "unknown"),
                 "credibility": info.get("credibility", 0.5),
-                "category": info.get("category", "general")
+                "category": info.get("category", "general"),
             })
         return {
             "sources": sorted(result, key=lambda x: x["credibility"], reverse=True),
-            "total": len(result)
+            "total": len(result),
         }
     else:
-        # Return simple list with count breakdown
         counts = get_source_count()
         return {
             "israeli_sources": sorted(ISRAELI_SOURCES_FEEDS.keys()),
@@ -90,15 +96,23 @@ async def get_sources(
         }
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# NEWS ENDPOINTS — All return MIXED Israel + Global content
+# Topic keyword filters ensure topical relevance is maintained.
+# ══════════════════════════════════════════════════════════════════════════════
+
 @router.get("/news/international", response_model=NewsResponse)
 async def international(
     limit: int = Query(20, ge=1, le=100),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
+    """
+    International news: global diplomatic, geopolitical, and UN affairs.
+    Returns MIXED articles — Israel's international stance + global world affairs.
+    """
     return await fetch_news(
         "international", limit,
-        israeli_only=False,
         exclude_negative=True,
         language="english",
         user_tier=user_tier,
@@ -112,9 +126,12 @@ async def economy(
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
+    """
+    Economy & finance news.
+    Returns MIXED articles — Israel economy + global markets, trade, finance.
+    """
     return await fetch_news(
         "economy", limit,
-        israeli_only=True,
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
@@ -127,9 +144,12 @@ async def defence(
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
+    """
+    Defence & security news.
+    Returns MIXED articles — IDF/Israel security + global military conflicts.
+    """
     return await fetch_news(
         "defence", limit,
-        israeli_only=True,
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
@@ -142,9 +162,12 @@ async def education(
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
+    """
+    Education news.
+    Returns MIXED articles — Israeli schools/universities + global education trends.
+    """
     return await fetch_news(
         "education", limit,
-        israeli_only=True,
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
@@ -158,9 +181,12 @@ async def community(
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
+    """
+    Community & society news.
+    Returns MIXED articles — Israeli society + global social/human rights.
+    """
     return await fetch_news(
         "community", limit,
-        israeli_only=True,
         exclude_negative=exclude_negative,
         language="english",
         user_tier=user_tier,
@@ -175,9 +201,13 @@ async def political(
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
+    """
+    Political news.
+    Returns MIXED articles — Israeli politics (Knesset, Netanyahu) + global politics.
+    Sport/entertainment articles are filtered out by topic keywords.
+    """
     return await fetch_news(
         "political", limit,
-        israeli_only=True,
         exclude_negative=exclude_negative,
         language="english",
         user_tier=user_tier,
@@ -191,9 +221,12 @@ async def positive(
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
+    """
+    Positive & uplifting news.
+    Returns MIXED articles — Israeli achievements + global breakthroughs and good news.
+    """
     return await fetch_news(
         "positive", limit,
-        israeli_only=True,
         exclude_negative=True,
         language="english",
         user_tier=user_tier,
@@ -207,9 +240,13 @@ async def sport(
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
+    """
+    Sports news.
+    Returns MIXED articles — Israeli sport (Maccabi, Hapoel) + global sport (FIFA, NBA, Olympics).
+    Political/economy articles are filtered out by topic keywords.
+    """
     return await fetch_news(
         "sport", limit,
-        israeli_only=True,
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
@@ -222,9 +259,12 @@ async def culture(
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
+    """
+    Culture & entertainment news.
+    Returns MIXED articles — Israeli culture (arts, film, music) + global entertainment.
+    """
     return await fetch_news(
         "culture", limit,
-        israeli_only=True,
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
@@ -237,9 +277,12 @@ async def environment(
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
+    """
+    Environment & climate news.
+    Returns MIXED articles — Israeli environment/energy + global climate change.
+    """
     return await fetch_news(
         "environment", limit,
-        israeli_only=True,
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
@@ -252,9 +295,12 @@ async def science(
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
+    """
+    Science & technology news.
+    Returns MIXED articles — Israeli tech startups/AI + global science breakthroughs.
+    """
     return await fetch_news(
         "science", limit,
-        israeli_only=True,
         language="english",
         user_tier=user_tier,
         with_analysis=with_analysis,
@@ -263,6 +309,10 @@ async def science(
 
 @router.get("/news/knesset")
 async def knesset(limit: int = Query(20, ge=1, le=50)):
+    """
+    Knesset bills and legislation.
+    Primary: Knesset OData API. Fallback: mixed RSS (Knesset + global parliament news).
+    """
     return await fetch_knesset_bills(limit)
 
 
@@ -272,10 +322,13 @@ async def arabic(
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
+    """
+    Arabic language news.
+    Returns MIXED articles — Arabic regional sources + Israeli Arabic/English sources.
+    """
     return await fetch_news(
         "arabic",
         limit,
-        israeli_only=False,
         exclude_negative=False,
         language="arabic",
         user_tier=user_tier,
@@ -289,4 +342,8 @@ async def all_news(
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
+    """
+    All categories combined.
+    Returns a unified feed of MIXED Israel + Global articles across all topics.
+    """
     return await fetch_all_news(limit, user_tier=user_tier, with_analysis=with_analysis)
