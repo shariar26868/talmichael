@@ -345,6 +345,53 @@ async def get_bill(
 
 
 
+@router.get("/bills/{bill_id}/vote", response_model=VoteResponse)
+async def get_bill_vote(
+    bill_id: str,
+    user_id: str = Query("000000000000000000000000", description="User ID to fetch their personal vote"),
+):
+    """
+    Get the current vote status for a bill.
+
+    Returns:
+    - **your_vote**: the given user's vote (support | oppose | neutral | none)
+    - **public_opinion**: aggregated support / oppose / neutral / total_votes counts
+    """
+    db = get_db()
+
+    # Verify bill exists
+    bill = await db.knesset_bills.find_one({"bill_id": bill_id})
+    if not bill:
+        raise HTTPException(status_code=404, detail="Bill not found")
+
+    # Fetch this user's personal vote (if any)
+    user_vote_doc = await db.user_bill_votes.find_one({"bill_id": bill_id, "user_id": user_id})
+    your_vote = user_vote_doc["vote"] if user_vote_doc else "none"
+
+    # Aggregate public opinion counts
+    base = get_bill_base_opinion(bill_id)
+
+    db_support = await db.user_bill_votes.count_documents({"bill_id": bill_id, "vote": "support"})
+    db_oppose  = await db.user_bill_votes.count_documents({"bill_id": bill_id, "vote": "oppose"})
+    db_neutral = await db.user_bill_votes.count_documents({"bill_id": bill_id, "vote": "neutral"})
+
+    total_support = base["support"] + db_support
+    total_oppose  = base["oppose"]  + db_oppose
+    total_neutral = base["neutral"] + db_neutral
+    total_votes   = total_support + total_oppose + total_neutral
+
+    return VoteResponse(
+        bill_id=bill_id,
+        your_vote=your_vote,
+        public_opinion=PublicOpinion(
+            support=total_support,
+            oppose=total_oppose,
+            neutral=total_neutral,
+            total_votes=total_votes,
+        ),
+    )
+
+
 @router.post("/bills/{bill_id}/vote", response_model=VoteResponse)
 async def vote_bill(
     bill_id: str,
