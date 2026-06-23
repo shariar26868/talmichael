@@ -43,6 +43,7 @@ from app.utils.feed_config import (
     ISRAELI_SOURCES_FEEDS, INTERNATIONAL_SOURCES_FEEDS, ARABIC_SOURCES_FEEDS,
     get_all_feeds, get_feeds_by_language, get_source_info,
 )
+from app.utils.image_enricher import enrich_images
 
 logger = logging.getLogger(__name__)
 
@@ -225,6 +226,11 @@ async def fetch_news(
             deduplicated.append(article)
 
     final_articles = deduplicated[:limit]
+
+    # ── Step 5b: OG Image enrichment ─────────────────────────────────────────
+    # Fetch og:image for articles missing image_url (e.g. Al Jazeera, Middle East Eye).
+    # Runs concurrently with semaphore; results are cached per-URL for 1 hour.
+    final_articles = await enrich_images(final_articles)
 
     # Count how many are Israeli vs global for metadata
     israel_count = sum(1 for a in final_articles if getattr(a, "source_type", "") == "israel")

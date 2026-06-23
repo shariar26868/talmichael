@@ -15,23 +15,51 @@ def _find_media_element(item, tag_name):
 
 
 def _extract_image_url(item, description: str | None) -> str | None:
-    # enclosure tag is the most common image container in RSS.
+    # ── 1. enclosure tag (most common: BBC, Sky News, etc.) ──────────────────
     enclosure = item.find("enclosure")
     if enclosure is not None and enclosure.get("url"):
-        return enclosure.get("url")
+        mime = enclosure.get("type", "")
+        # Accept any enclosure that is an image or has no type (assume image)
+        if not mime or mime.startswith("image"):
+            return enclosure.get("url")
 
+    # ── 2. media:content (Yahoo Media RSS namespace) ──────────────────────────
     media_content = _find_media_element(item, "content")
     if media_content is not None and media_content.get("url"):
         return media_content.get("url")
 
+    # ── 3. media:thumbnail ────────────────────────────────────────────────────
     media_thumbnail = _find_media_element(item, "thumbnail")
     if media_thumbnail is not None and media_thumbnail.get("url"):
         return media_thumbnail.get("url")
 
-    if description:
-        match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', description, re.IGNORECASE)
+    # ── 4. content:encoded (many CMS-based feeds embed <img> in full HTML) ───
+    content_encoded = (
+        item.find("{http://purl.org/rss/1.0/modules/content/}encoded")
+        or item.find("content:encoded")
+    )
+    if content_encoded is not None and content_encoded.text:
+        match = re.search(
+            r'<img[^>]+src=["\']([^"\']+)["\']',
+            content_encoded.text,
+            re.IGNORECASE,
+        )
         if match:
-            return match.group(1)
+            url = match.group(1)
+            if url.startswith("http"):
+                return url
+
+    # ── 5. <img src> in RSS description HTML ─────────────────────────────────
+    if description:
+        match = re.search(
+            r'<img[^>]+src=["\']([^"\']+)["\']',
+            description,
+            re.IGNORECASE,
+        )
+        if match:
+            url = match.group(1)
+            if url.startswith("http"):
+                return url
 
     return None
 
