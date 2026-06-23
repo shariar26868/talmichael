@@ -78,7 +78,79 @@ def _extract_og_from_html(html: str) -> Optional[str]:
     return None
 
 
-async def _fetch_og_image(url: str) -> Optional[str]:
+# Regex to extract real article URL from Google News RSS description HTML.
+# Google News RSS descriptions look like:
+#   <a href="https://news.google.com/rss/articles/CBM...">Title</a> ... Source
+# But we want the resolved URL. We detect google news links and use the description
+# href or follow the HTTP redirect to find the canonical URL.
+_GNEWS_RE = re.compile(r"news\.google\.com", re.IGNORECASE)
+_HREF_RE = re.compile(r'href=["\']([^"\']+)["\']', re.IGNORECASE)
+
+
+def _resolve_gnews_url_from_description(description: str) -> Optional[str]:
+    """
+    Google News RSS articles often have descriptions like:
+      <a href="https://news.google.com/rss/articles/CBM...?oc=5">Title</a> Source
+    The link tag inside points back to Google News, not the publisher.
+    
+    Some feeds embed the real source URL differently. We scan the description
+    for any non-Google-News href and return it as the canonical URL.
+    """
+    if not description:
+        return None
+    hrefs = _HREF_RE.findall(description)
+    for href in hrefs:
+        if href.startswith("http") and "google.com" not in href:
+            return href
+    return None
+
+
+async def _get_resolved_url(url: str, description: str = "") -> str:
+    """
+    For Google News RSS links, attempt to find the real article URL:
+    1. From a non-Google href in the article description HTML
+    2. Using googlenewsdecoder (batchexecute internal API) inside a thread pool
+    3. Falling back to HTTP redirect following (legacy)
+    Returns the original URL unchanged for non-Google links.
+    """
+    if not _GNEWS_RE.search(url):
+        return url  # Not a Google News link — use as-is
+
+    # 1. Try description first (zero network cost)
+    real_url = _resolve_gnews_url_from_description(description)
+    if real_url:
+        return real_url
+
+    # 2. Try googlenewsdecoder (new method using batchexecute RPC)
+    try:
+        from googlenewsdecoder import new_decoderv1
+        res = await asyncio.to_thread(new_decoderv1, url)
+        if res.get("status") and res.get("decoded_url"):
+            return res["decoded_url"]
+    except Exception as exc:
+        logger.debug(f"googlenewsdecoder failed for {url}: {exc}")
+
+    # 3. Follow the redirect to discover the real URL (legacy fallback)
+    try:
+        async with httpx.AsyncClient(
+            timeout=FETCH_TIMEOUT,
+            headers=_HEADERS,
+            follow_redirects=True,
+            trust_env=False,
+        ) as client:
+            resp = await client.get(url)
+            final_url = str(resp.url)
+            # Only use if we actually landed on a non-Google page
+            if "google.com" not in final_url:
+                return final_url
+    except Exception:
+        pass
+
+    return url  # Give up — use original Google News URL
+
+
+
+async def _fetch_og_image(url: str, description: str = "") -> Optional[str]:
     """
     Fetch og:image for a given article URL.
     Returns the image URL string or None.
@@ -92,12 +164,14 @@ async def _fetch_og_image(url: str) -> Optional[str]:
         if domain in url:
             return None
 
-    # Check cache first
+    # Check cache first (use original URL as key)
     cache_key = _og_cache_key(url)
     cached = await cache_get(cache_key)
     if cached is not None:
-        # Cached "" means we tried and found nothing — treat as None
         return cached if cached else None
+
+    # Resolve real URL for Google News links
+    resolved_url = await _get_resolved_url(url, description)
 
     try:
         async with httpx.AsyncClient(
@@ -106,9 +180,9 @@ async def _fetch_og_image(url: str) -> Optional[str]:
             follow_redirects=True,
             trust_env=False,
         ) as client:
-            resp = await client.get(url)
+            resp = await client.get(resolved_url)
             if resp.status_code >= 400:
-                await cache_set(cache_key, "", OG_IMAGE_TTL)  # cache miss sentinel
+                await cache_set(cache_key, "", OG_IMAGE_TTL)
                 return None
 
             # Read only the first MAX_HTML_BYTES to find <head> og tags
@@ -116,13 +190,13 @@ async def _fetch_og_image(url: str) -> Optional[str]:
             html = raw.decode("utf-8", errors="replace")
             image_url = _extract_og_from_html(html)
 
-            # Cache result (empty string for miss, URL for hit)
+            # Cache result against original URL
             await cache_set(cache_key, image_url or "", OG_IMAGE_TTL)
             return image_url
 
     except Exception as exc:
-        logger.debug(f"OG image fetch failed [{url}]: {exc}")
-        await cache_set(cache_key, "", OG_IMAGE_TTL)  # cache failure to avoid retry flood
+        logger.debug(f"OG image fetch failed [{resolved_url}]: {exc}")
+        await cache_set(cache_key, "", OG_IMAGE_TTL)
         return None
 
 
@@ -152,7 +226,8 @@ async def enrich_images(articles: list, max_articles: int = 30) -> list:
 
     async def _bounded_fetch(idx: int, article) -> tuple[int, Optional[str]]:
         async with semaphore:
-            img = await _fetch_og_image(article.link)
+            desc = getattr(article, "description", "") or ""
+            img = await _fetch_og_image(article.link, description=desc)
             return idx, img
 
     tasks = [_bounded_fetch(i, a) for i, a in needs_image]

@@ -24,3 +24,8 @@ twscrape>=0.17.0
 
 # AI
 openai>=2.26.0,<3.0.0
+
+# Google News decoding & HTML parsing
+googlenewsdecoder==0.1.7
+selectolax==0.4.10
+

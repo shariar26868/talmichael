@@ -55,6 +55,39 @@ ISRAELI_SOURCES: set[str] = {
     "Local Call (Sikha Mekomit)",
     "Israel Policy Forum",
     "Google News Israel",
+    # ── .co.il domains (Israeli Hebrew editions) ──────────────────────────
+    "haaretz.co.il",
+    "israelhayom.co.il",
+    "nrg.co.il",
+    "mynet.co.il",
+    "behadrei.co.il",
+    "srugim.co.il",
+    "kikar.co.il",
+    "inn.co.il",            # Arutz Sheva Hebrew
+    "arutz7.co.il",
+    "hidabroot.com",
+    # ── Hebrew display names (from Google News RSS <source> tags) ─────────
+    "הארץ",                 # Haaretz Hebrew
+    "ידיעות אחרונות",       # Yedioth Ahronoth
+    "מעריב",                # Maariv
+    "ישראל היום", "היום",   # Israel Hayom Hebrew
+    "ynet", "וואלה",        # Ynet / Walla Hebrew
+    "כאן", "כאן 11",        # Kan public broadcast
+    "N12", "ערוץ 12",       # Channel 12
+    "ערוץ 13",              # Channel 13
+    "גלובס",                # Globes Hebrew
+    "כלכליסט",              # Calcalist Hebrew
+    "TheMarker", "דה מרקר",
+    "ספורט 5",              # Sport5 Hebrew
+    "mako",                 # Mako (Channel 12 website)
+    "nrg",                  # NRG (Maariv Online)
+    "walla",
+    "בחדרי חרדים",          # Behadrei Haredim
+    "כיכר השבת",            # Kikar Hashabbat
+    "סרוגים",               # Srugim
+    "ערוץ 7",               # Arutz 7
+    "גלי ישראל",            # Galei Israel
+    "www.israelhayom.com",  # Google News source tag variant
 }
 
 BLOCKED_SOURCES: set[str] = {
@@ -254,12 +287,25 @@ TOPIC_MIN_HITS: int = 1
 
 
 def is_israeli_source(source_name: Optional[str], source_url: Optional[str]) -> bool:
-    if source_name and source_name in ISRAELI_SOURCES:
-        return True
+    # 1. Fast exact set lookup on display name
+    if source_name:
+        if source_name in ISRAELI_SOURCES:
+            return True
+        # Case-insensitive fallback (handles 'www.israelhayom.com' Google News tags)
+        if source_name.lower() in {s.lower() for s in ISRAELI_SOURCES}:
+            return True
+
+    # 2. URL-based checks
     if source_url:
+        url_lower = source_url.lower()
+        # Shortcut: any .co.il domain is Israeli by definition
+        if ".co.il" in url_lower:
+            return True
+        # Whitelist domain scan
         for domain in ISRAELI_SOURCES:
-            if domain in source_url:
+            if domain and domain in url_lower:
                 return True
+
     return False
 
 
