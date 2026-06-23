@@ -91,14 +91,32 @@ async def test_bills_flow():
         assert res_data["public_opinion"]["total_votes"] == 12451
         print("PASS: Vote registered, total votes incremented to 12451.")
 
+        # Overwrite vote: test_user_1 changes vote to 'oppose'
+        payload = {"vote": "oppose"}
+        resp = await client.post("/bills/security-2026/vote?user_id=test_user_1", json=payload)
+        assert resp.status_code == 200
+        res_data = resp.json()
+        assert res_data["your_vote"] == "oppose"
+        assert res_data["public_opinion"]["total_votes"] == 12451  # total remains same
+        print("PASS: Vote changed successfully, total votes remains 12451.")
+
+        # Retract vote: test_user_1 removes vote by sending 'none'
+        payload = {"vote": "none"}
+        resp = await client.post("/bills/security-2026/vote?user_id=test_user_1", json=payload)
+        assert resp.status_code == 200
+        res_data = resp.json()
+        assert res_data["your_vote"] == "none"
+        assert res_data["public_opinion"]["total_votes"] == 12450  # total decrements back to base
+        print("PASS: Vote retracted successfully, total votes decremented to 12450.")
+
         # Let's verify voting 'neutral' from another user updates totals
         payload = {"vote": "neutral"}
         resp = await client.post("/bills/security-2026/vote?user_id=test_user_2", json=payload)
         assert resp.status_code == 200
         res_data = resp.json()
-        print("Second vote response:", json.dumps(res_data, indent=2))
-        assert res_data["public_opinion"]["total_votes"] == 12452
-        print("PASS: Second vote registered, total votes incremented to 12452.")
+        print("Second user vote response:", json.dumps(res_data, indent=2))
+        assert res_data["public_opinion"]["total_votes"] == 12451
+        print("PASS: Second vote registered, total votes incremented to 12451.")
 
         # Let's check error handling for invalid vote choices
         payload = {"vote": "invalid_choice"}

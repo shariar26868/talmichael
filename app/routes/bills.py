@@ -41,7 +41,7 @@ class BillsListResponse(BaseModel):
 
 
 class VoteRequest(BaseModel):
-    vote: str = Field(..., description="support | oppose | neutral")
+    vote: str = Field(..., description="support | oppose | neutral | none")
 
 
 class PublicOpinion(BaseModel):
@@ -387,15 +387,19 @@ async def vote_bill(
         raise HTTPException(status_code=404, detail="Bill not found")
 
     vote_choice = body.vote.lower()
-    if vote_choice not in ("support", "oppose", "neutral"):
-        raise HTTPException(status_code=400, detail="Invalid vote. Must be support | oppose | neutral")
+    if vote_choice not in ("support", "oppose", "neutral", "none"):
+        raise HTTPException(status_code=400, detail="Invalid vote. Must be support | oppose | neutral | none")
 
-    # Record the user's vote
-    await db.user_bill_votes.update_one(
-        {"bill_id": bill_id, "user_id": user_id},
-        {"$set": {"vote": vote_choice, "updated_at": datetime.utcnow()}},
-        upsert=True
-    )
+    if vote_choice == "none":
+        # Remove the user's vote
+        await db.user_bill_votes.delete_one({"bill_id": bill_id, "user_id": user_id})
+    else:
+        # Record the user's vote
+        await db.user_bill_votes.update_one(
+            {"bill_id": bill_id, "user_id": user_id},
+            {"$set": {"vote": vote_choice, "updated_at": datetime.utcnow()}},
+            upsert=True
+        )
 
     # Calculate dynamic public opinion
     base = get_bill_base_opinion(bill_id)
