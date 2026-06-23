@@ -312,6 +312,62 @@ async def list_bills(
 
 
 
+@router.get("/bills/{bill_id}", response_model=BillOut)
+async def get_bill(
+    bill_id: str,
+    user_tier: str = Query("free", description="User tier: free | pro"),
+    with_analysis: bool = Query(False, description="Whether to include AI analysis"),
+):
+    """
+    Get a single bill by its ID.
+    AI analysis features are unlocked unless user_tier=pro and with_analysis=true.
+    """
+    db = get_db()
+
+    # Query MongoDB for the bill document
+    doc = await db.knesset_bills.find_one({"bill_id": bill_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Bill not found")
+
+    # If PRO tier and analysis is requested, run GPT-4o translation/analysis or get cached
+    if with_analysis and user_tier == "pro":
+        doc = await get_or_generate_bill_analysis(doc, run_llm=True)
+
+    # Determine fields
+    title = doc.get("title_en") or doc.get("title") or doc.get("name") or f"Bill {bill_id}"
+    proposed_by = doc.get("proposed_by") or doc.get("committee") or doc.get("initiator") or "Knesset Committee"
+    date = doc.get("date") or doc.get("publication_date") or doc.get("last_updated") or "Unknown"
+
+    category_tags = doc.get("category_tags") or []
+    if not category_tags:
+        sub_type = doc.get("sub_type") or doc.get("type")
+        category_tags = [sub_type] if sub_type else ["Legislation"]
+
+    # Handle AI analysis based on tier and parameter
+    explanation = None
+    key_provisions = None
+
+    if with_analysis:
+        if user_tier == "pro":
+            explanation = doc.get("explanation")
+            key_provisions = doc.get("key_provisions")
+            category_tags = doc.get("category_tags") or category_tags
+        else:
+            explanation = "Upgrade to PRO tier to view AI analysis."
+            key_provisions = ["Upgrade to PRO tier to view key provisions."]
+
+    return BillOut(
+        bill_id=bill_id,
+        title=title,
+        proposed_by=proposed_by,
+        date=date,
+        explanation=explanation,
+        key_provisions=key_provisions,
+        category_tags=category_tags
+    )
+
+
+
 @router.post("/bills/{bill_id}/vote", response_model=VoteResponse)
 async def vote_bill(
     bill_id: str,

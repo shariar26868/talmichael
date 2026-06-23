@@ -141,6 +141,30 @@ async def test_bills_flow():
         
         print("PASS: Date-wise filtering for bills works perfectly and returns full AI explanations.")
 
+        print("\n" + "="*60)
+        print("TEST 6: GET /bills/{bill_id} (Single Bill Retrieval)")
+        print("="*60)
+        # 1. Get existing bill with pro tier and analysis
+        resp = await client.get("/bills/energy-2026?user_tier=pro&with_analysis=true")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        bill = resp.json()
+        print(f"Single Bill ID: {bill['bill_id']} | Title: {bill['title']}")
+        assert bill["bill_id"] == "energy-2026"
+        assert bill["explanation"] is not None
+        assert "mandates the integration of solar and wind" in bill["explanation"]
+        
+        # 2. Get with free tier and analysis
+        resp = await client.get("/bills/energy-2026?user_tier=free&with_analysis=true")
+        assert resp.status_code == 200
+        bill_free = resp.json()
+        assert "Upgrade to PRO" in bill_free["explanation"]
+        print("PASS: Locked notice returned correctly on single bill free tier with analysis.")
+        
+        # 3. Get non-existent bill
+        resp = await client.get("/bills/nonexistent-id")
+        assert resp.status_code == 404
+        print("PASS: Nonexistent single bill correctly returns 404 Not Found.")
+
     await close_db()
 
 if __name__ == "__main__":
