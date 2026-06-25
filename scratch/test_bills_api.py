@@ -116,7 +116,21 @@ async def test_bills_flow():
         res_data = resp.json()
         print("Second user vote response:", json.dumps(res_data, indent=2))
         assert res_data["public_opinion"]["total_votes"] == 1
+        assert res_data["public_opinion"]["neutral"] == 1
         print("PASS: Second vote registered, total votes incremented to 1.")
+
+        # Let's verify voting 'abstain' from a third user updates totals
+        payload = {"vote": "abstain"}
+        resp = await client.post("/bills/security-2026/vote?user_id=test_user_3", json=payload)
+        assert resp.status_code == 200
+        res_data = resp.json()
+        print("Third user vote response:", json.dumps(res_data, indent=2))
+        assert res_data["public_opinion"]["total_votes"] == 2
+        assert res_data["public_opinion"]["abstain"] == 1
+        print("PASS: Third vote (abstain) registered, total votes incremented to 2.")
+
+        # Clean up database votes for consistency
+        await db.user_bill_votes.delete_many({"bill_id": "security-2026", "user_id": {"$in": ["test_user_1", "test_user_2", "test_user_3"]}})
 
         # Let's check error handling for invalid vote choices
         payload = {"vote": "invalid_choice"}

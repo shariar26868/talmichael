@@ -41,13 +41,14 @@ class BillsListResponse(BaseModel):
 
 
 class VoteRequest(BaseModel):
-    vote: str = Field(..., description="support | oppose | neutral | none")
+    vote: str = Field(..., description="support | oppose | neutral | abstain | none")
 
 
 class PublicOpinion(BaseModel):
     support: int
     oppose: int
     neutral: int
+    abstain: int
     total_votes: int
 
 
@@ -154,7 +155,7 @@ async def get_or_generate_bill_analysis(bill_doc: dict, run_llm: bool = False) -
 
 def get_bill_base_opinion(bill_id: str) -> dict:
     """Returns baseline public opinion counts for both mockup and real Knesset bills."""
-    return {"support": 0, "oppose": 0, "neutral": 0, "total": 0}
+    return {"support": 0, "oppose": 0, "neutral": 0, "abstain": 0, "total": 0}
 
 
 def _filter_mock_bill(doc: dict, days: Optional[int]) -> bool:
@@ -354,8 +355,8 @@ async def get_bill_vote(
     Get the current vote status for a bill.
 
     Returns:
-    - **your_vote**: the given user's vote (support | oppose | neutral | none)
-    - **public_opinion**: aggregated support / oppose / neutral / total_votes counts
+    - **your_vote**: the given user's vote (support | oppose | neutral | abstain | none)
+    - **public_opinion**: aggregated support / oppose / neutral / abstain / total_votes counts
     """
     db = get_db()
 
@@ -374,11 +375,13 @@ async def get_bill_vote(
     db_support = await db.user_bill_votes.count_documents({"bill_id": bill_id, "vote": "support"})
     db_oppose  = await db.user_bill_votes.count_documents({"bill_id": bill_id, "vote": "oppose"})
     db_neutral = await db.user_bill_votes.count_documents({"bill_id": bill_id, "vote": "neutral"})
+    db_abstain = await db.user_bill_votes.count_documents({"bill_id": bill_id, "vote": "abstain"})
 
     total_support = base["support"] + db_support
     total_oppose  = base["oppose"]  + db_oppose
     total_neutral = base["neutral"] + db_neutral
-    total_votes   = total_support + total_oppose + total_neutral
+    total_abstain = base.get("abstain", 0) + db_abstain
+    total_votes   = total_support + total_oppose + total_neutral + total_abstain
 
     return VoteResponse(
         bill_id=bill_id,
@@ -387,6 +390,7 @@ async def get_bill_vote(
             support=total_support,
             oppose=total_oppose,
             neutral=total_neutral,
+            abstain=total_abstain,
             total_votes=total_votes,
         ),
     )
@@ -400,7 +404,7 @@ async def vote_bill(
 ):
     """
     Vote on a bill.
-    Supports 'support', 'oppose', and 'neutral' choices.
+    Supports 'support', 'oppose', 'neutral', and 'abstain' choices.
     Tallies are updated dynamically by combining user votes with seed baseline data.
     """
     db = get_db()
@@ -411,8 +415,8 @@ async def vote_bill(
         raise HTTPException(status_code=404, detail="Bill not found")
 
     vote_choice = body.vote.lower()
-    if vote_choice not in ("support", "oppose", "neutral", "none"):
-        raise HTTPException(status_code=400, detail="Invalid vote. Must be support | oppose | neutral | none")
+    if vote_choice not in ("support", "oppose", "neutral", "abstain", "none"):
+        raise HTTPException(status_code=400, detail="Invalid vote. Must be support | oppose | neutral | abstain | none")
 
     if vote_choice == "none":
         # Remove the user's vote
@@ -432,11 +436,13 @@ async def vote_bill(
     db_support = await db.user_bill_votes.count_documents({"bill_id": bill_id, "vote": "support"})
     db_oppose = await db.user_bill_votes.count_documents({"bill_id": bill_id, "vote": "oppose"})
     db_neutral = await db.user_bill_votes.count_documents({"bill_id": bill_id, "vote": "neutral"})
+    db_abstain = await db.user_bill_votes.count_documents({"bill_id": bill_id, "vote": "abstain"})
 
     total_support = base["support"] + db_support
     total_oppose = base["oppose"] + db_oppose
     total_neutral = base["neutral"] + db_neutral
-    total_votes = total_support + total_oppose + total_neutral
+    total_abstain = base.get("abstain", 0) + db_abstain
+    total_votes = total_support + total_oppose + total_neutral + total_abstain
 
     return VoteResponse(
         bill_id=bill_id,
@@ -445,6 +451,7 @@ async def vote_bill(
             support=total_support,
             oppose=total_oppose,
             neutral=total_neutral,
+            abstain=total_abstain,
             total_votes=total_votes
         )
     )
