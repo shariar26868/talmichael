@@ -7,6 +7,30 @@ from pydantic import BaseModel, EmailStr, field_validator
 
 # ── News ──────────────────────────────────────────────────────────────────────
 
+from typing import Dict
+
+
+class CategorySummary(BaseModel):
+    """AI-generated digest for one news category over a given period."""
+    category: str
+    article_count: int
+    top_headlines: list[str]             # Up to 5 notable headlines
+    summary: str                         # AI prose summary of the period
+    key_themes: list[str]                # Main recurring themes
+    sentiment_breakdown: Dict[str, int]  # {"positive": N, "neutral": N, "negative": N}
+    sources_cited: list[str]             # Unique source names seen
+
+
+class NewsSummaryResponse(BaseModel):
+    """Top-level response for /news/summary/7days and /news/summary/30days."""
+    period: str                          # "7days" | "30days"
+    period_days: int                     # 7 | 30
+    generated_at: str                    # ISO-8601 timestamp
+    date_range: Dict[str, str]           # {"from": "YYYY-MM-DD", "to": "YYYY-MM-DD"}
+    total_articles_processed: int
+    categories_included: list[str]
+    summaries: Dict[str, CategorySummary]
+
 class FeedMeta(BaseModel):
     title: str
     description: str

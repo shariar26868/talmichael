@@ -17,6 +17,7 @@ from app.routes.qa import router as qa_router
 from app.routes.health import router as health_router
 from app.routes.bills import router as bills_router
 from app.routes.statistics import router as statistics_router
+from app.routes.summary import router as summary_router
 
 
 @asynccontextmanager
@@ -53,6 +54,7 @@ app.include_router(qa_router)
 app.include_router(health_router)
 app.include_router(bills_router)
 app.include_router(statistics_router)
+app.include_router(summary_router)
 
 
 

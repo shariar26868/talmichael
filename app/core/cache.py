@@ -17,9 +17,11 @@ NEWS_TTL    = 300    # 5 min
 BILLS_TTL   = 600    # 10 min
 SOURCE_TTL  = 3600   # 1 hour
 AI_TTL      = 1800   # 30 min
-INSIGHTS_TTL = 900   # 15 min
-TRENDS_TTL   = 600   # 10 min
-QA_TTL       = 300   # 5 min
+INSIGHTS_TTL    = 900    # 15 min
+TRENDS_TTL      = 600    # 10 min
+QA_TTL          = 300    # 5 min
+SUMMARY_7D_TTL  = 3600   # 1 hour  — 7-day digests (expensive AI calls)
+SUMMARY_30D_TTL = 10800  # 3 hours — 30-day digests
 
 
 async def cache_get(key: str) -> Optional[Any]:
@@ -66,3 +68,6 @@ def source_key(source_name: str) -> str:
 
 def ai_analysis_key(article_guid: str) -> str:
     return f"ai:analysis:{article_guid}"
+
+def summary_key(period_days: int) -> str:
+    return f"news:summary:{period_days}d"

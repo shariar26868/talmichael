@@ -290,7 +290,61 @@ async def fetch_news(
         key = news_key(category, limit, False, exclude_negative, language, user_tier, with_analysis)
         await cache_set(key, news.model_dump(), NEWS_TTL)
 
+    # ── Persist articles to MongoDB (fire-and-forget) ─────────────────────────
+    # Save every fetched article to db.cached_articles so they are available
+    # for search, history, and cross-source analysis without re-fetching.
+    asyncio.create_task(_save_articles_to_db(news.articles, category))
+
     return news
+
+
+async def _save_articles_to_db(articles: list, category: str) -> None:
+    """
+    Upsert fetched articles into db.cached_articles.
+    Uses guid (or link) as the unique key — safe to call multiple times.
+    Runs as a background task so it never blocks the API response.
+    """
+    try:
+        from app.core.database import get_db
+        from datetime import datetime
+
+        db = get_db()
+        now = datetime.utcnow()
+
+        ops = []
+        from pymongo import UpdateOne
+
+        for art in articles:
+            try:
+                d = art.model_dump() if hasattr(art, "model_dump") else dict(art)
+            except Exception:
+                continue
+
+            unique_key = d.get("guid") or d.get("link")
+            if not unique_key:
+                continue
+
+            d["category"] = category
+            d["fetched_at"] = now
+
+            ops.append(
+                UpdateOne(
+                    {"guid": unique_key},
+                    {"$setOnInsert": {"first_seen": now}, "$set": d},
+                    upsert=True,
+                )
+            )
+
+        if ops:
+            result = await db.cached_articles.bulk_write(ops, ordered=False)
+            logger.debug(
+                "[cached_articles] category=%s upserted=%d matched=%d",
+                category, result.upserted_count, result.matched_count,
+            )
+    except Exception as e:
+        logger.warning("Failed to save articles to MongoDB: %s", e)
+
+
 
 
 async def fetch_all_news(limit: int, user_tier: str = "free", with_analysis: bool = False) -> dict:

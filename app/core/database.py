@@ -74,6 +74,8 @@ async def init_db() -> None:
         IndexModel([("guid", ASCENDING)], unique=True, name="cached_articles_guid_key"),
         IndexModel([("category", ASCENDING)], name="cached_articles_category_key"),
         IndexModel([("fetched_at", DESCENDING)], name="cached_articles_fetched_at_key"),
+        IndexModel([("first_seen", DESCENDING)], name="cached_articles_first_seen_key"),
+        IndexModel([("source_type", ASCENDING)], name="cached_articles_source_type_key"),
     ])
 
     # knesset_bills
