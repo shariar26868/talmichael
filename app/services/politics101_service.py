@@ -304,7 +304,12 @@ async def _fetch_sessions_via_ai() -> list[dict]:
         return []
     try:
         client = AsyncOpenAI(api_key=settings.openai_api_key)
-        prompt = """List 5 of the most important and recent Knesset (Israeli parliament) sessions or debates from 2024-2026. Include major budget debates, war cabinet debates, judicial reform votes, or any landmark legislation.
+        prompt = """List 5 of the most important Knesset (Israeli parliament) sessions and debates from recent years (2020-2024). Include major debates on these topics:
+- War/security decisions
+- Judicial reform
+- Budget/economy
+- Government coalition crises
+- Landmark legislation
 
 Respond ONLY with a JSON array:
 [
@@ -312,10 +317,10 @@ Respond ONLY with a JSON array:
     "session_id": "ai_001",
     "date": "YYYY-MM-DD",
     "type": "Plenary|Committee|Budget",
-    "title": "...",
+    "title": "Session title",
     "summary": "2-3 sentence factual summary",
     "importance": "high|medium",
-    "source": "AI Knowledge Base",
+    "source": "Historical Knowledge",
     "tags": ["tag1", "tag2"]
   }
 ]"""
@@ -326,11 +331,23 @@ Respond ONLY with a JSON array:
             max_tokens=1200,
         )
         content = resp.choices[0].message.content.strip()
+        
+        # Remove markdown code fence if present
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+            content = content.strip()
+        
         if content.startswith("["):
-            return json.loads(content)
+            sessions = json.loads(content)
+            return sessions if isinstance(sessions, list) else []
+        else:
+            logger.warning("AI response didn't start with [: %s", content[:100])
     except Exception as e:
-        logger.warning("AI session fetch failed: %s", e)
+        logger.error("AI session fetch failed: %s", e)
     return []
+
 
 
 async def get_bills_passed(limit: int = 10) -> dict:
