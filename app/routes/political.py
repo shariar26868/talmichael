@@ -106,12 +106,34 @@ async def list_parties():
     return {"total": len(parties), "parties": parties}
 
 
+@router.get(
+    "/parties/agenda-comparison",
+    summary="Political agenda comparison — horizontal table",
+    description=(
+        "Returns agenda data for all (or filtered) parties, structured by policy topic. "
+        "Powers the horizontal-scrollable Political Agenda Comparison panel. "
+        "Each party = one column. Topics: economy, security, judiciary, social, foreign_policy. "
+        "Agenda data is sourced from official party websites."
+    ),
+)
+async def agenda_comparison(
+    bloc: Optional[str] = Query(
+        None,
+        description="Filter by bloc: 'coalition' | 'opposition' | 'arab_parties'",
+    )
+):
+    """Get political agenda comparison table (all parties or filtered by bloc)."""
+    from app.services.blocs_service import get_agenda_comparison
+    return await get_agenda_comparison(bloc=bloc)
+
+
 @router.get("/parties/{party_id}")
 async def party_detail(party_id: str):
     party = await get_party(party_id)
     if not party:
         raise HTTPException(status_code=404, detail="Party not found")
     return party
+
 
 
 @router.get("/committees")

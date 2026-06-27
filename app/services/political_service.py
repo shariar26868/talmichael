@@ -64,6 +64,7 @@ PARTY_ENRICHMENT = {
     "הליכוד": {
         "name": "Likud",
         "wing": "right",
+        "bloc": "coalition",
         "leader": "Benjamin Netanyahu",
         "ideology": "National liberalism, conservatism",
         "agenda": "Promotes national security, economic deregulation, secular-religious status quo, and Jewish heritage.",
@@ -79,6 +80,7 @@ PARTY_ENRICHMENT = {
     "יש עתיד": {
         "name": "Yesh Atid",
         "wing": "center",
+        "bloc": "opposition",
         "leader": "Yair Lapid",
         "ideology": "Liberalism, secularism",
         "agenda": "Advocates for middle-class economic relief, anti-corruption reforms, civil marriage, and regional peace.",
@@ -93,6 +95,7 @@ PARTY_ENRICHMENT = {
     "המחנה הממלכתי": {
         "name": "National Unity",
         "wing": "center",
+        "bloc": "opposition",
         "leader": "Benny Gantz",
         "ideology": "Liberal Zionism, security centrism",
         "agenda": "Focuses on state stability, consensus building, judicial preservation, and pragmatic security.",
@@ -104,9 +107,40 @@ PARTY_ENRICHMENT = {
         ],
         "data_freshness": "2026-06-15",
     },
+    "כחול לבן - המחנה הממלכתי": {
+        "name": "National Unity",
+        "wing": "center",
+        "bloc": "opposition",
+        "leader": "Benny Gantz",
+        "ideology": "Liberal Zionism, security centrism",
+        "agenda": "Focuses on state stability, consensus building, judicial preservation, and pragmatic security.",
+        "website": "https://www.machane.org.il/",
+        "wikipedia_url": "https://en.wikipedia.org/wiki/National_Unity_(Israel)",
+        "source_links": [
+            {"label": "Official Website", "url": "https://www.machane.org.il/"},
+            {"label": "Wikipedia", "url": "https://en.wikipedia.org/wiki/National_Unity_(Israel)"},
+        ],
+        "data_freshness": "2026-06-15",
+    },
+    'התאחדות הספרדים שומרי תורה תנועתו של מרן הרב עובדיה יוסף זצ"ל': {
+        "name": "Shas",
+        "wing": "right",
+        "bloc": "coalition",
+        "leader": "Aryeh Deri",
+        "ideology": "Torah values, Sephardic advocacy",
+        "agenda": "Focuses on welfare assistance, religious education funding, support for lower-income families, and Sephardic heritage.",
+        "website": "https://www.shas.org.il/",
+        "wikipedia_url": "https://en.wikipedia.org/wiki/Shas",
+        "source_links": [
+            {"label": "Official Website", "url": "https://www.shas.org.il/"},
+            {"label": "Wikipedia", "url": "https://en.wikipedia.org/wiki/Shas"},
+        ],
+        "data_freshness": "2026-06-15",
+    },
     "שס": {
         "name": "Shas",
         "wing": "right",
+        "bloc": "coalition",
         "leader": "Aryeh Deri",
         "ideology": "Torah values, Sephardic advocacy",
         "agenda": "Focuses on welfare assistance, religious education funding, support for lower-income families, and Sephardic heritage.",
@@ -121,6 +155,7 @@ PARTY_ENRICHMENT = {
     'ש"ס': {
         "name": "Shas",
         "wing": "right",
+        "bloc": "coalition",
         "leader": "Aryeh Deri",
         "ideology": "Torah values, Sephardic advocacy",
         "agenda": "Focuses on welfare assistance, religious education funding, support for lower-income families, and Sephardic heritage.",
@@ -135,6 +170,7 @@ PARTY_ENRICHMENT = {
     "יהדות התורה": {
         "name": "United Torah Judaism",
         "wing": "right",
+        "bloc": "coalition",
         "leader": "Yitzhak Goldknopf",
         "ideology": "Ultra-Orthodox Judaism, Haredi interests",
         "agenda": "Protects Haredi autonomy in education, secures housing and childcare subsidies, and opposes military conscription of yeshiva students.",
@@ -149,6 +185,22 @@ PARTY_ENRICHMENT = {
     "יהדות התורה והשבת": {
         "name": "United Torah Judaism",
         "wing": "right",
+        "bloc": "coalition",
+        "leader": "Yitzhak Goldknopf",
+        "ideology": "Ultra-Orthodox Judaism, Haredi interests",
+        "agenda": "Protects Haredi autonomy in education, secures housing and childcare subsidies, and opposes military conscription of yeshiva students.",
+        "website": "https://www.degeltorah.org.il/",
+        "wikipedia_url": "https://en.wikipedia.org/wiki/United_Torah_Judaism",
+        "source_links": [
+            {"label": "Official Website", "url": "https://www.degeltorah.org.il/"},
+            {"label": "Wikipedia", "url": "https://en.wikipedia.org/wiki/United_Torah_Judaism"},
+        ],
+        "data_freshness": "2026-06-15",
+    },
+    "יהדות התורה והשבת אגודת ישראל - דגל התורה": {
+        "name": "United Torah Judaism",
+        "wing": "right",
+        "bloc": "coalition",
         "leader": "Yitzhak Goldknopf",
         "ideology": "Ultra-Orthodox Judaism, Haredi interests",
         "agenda": "Protects Haredi autonomy in education, secures housing and childcare subsidies, and opposes military conscription of yeshiva students.",
@@ -163,6 +215,7 @@ PARTY_ENRICHMENT = {
     "הציונות הדתית": {
         "name": "Religious Zionist Party",
         "wing": "right",
+        "bloc": "coalition",
         "leader": "Bezalel Smotrich",
         "ideology": "Religious Zionism, ultranationalism",
         "agenda": "Advocates for settlement expansion, judicial restructure, Jewish national identity, and conservative social policies.",
@@ -177,6 +230,7 @@ PARTY_ENRICHMENT = {
     "הציונות הדתית בראשות בצלאל סמוטריץ'": {
         "name": "Religious Zionist Party",
         "wing": "right",
+        "bloc": "coalition",
         "leader": "Bezalel Smotrich",
         "ideology": "Religious Zionism, ultranationalism",
         "agenda": "Advocates for settlement expansion, judicial restructure, Jewish national identity, and conservative social policies.",
@@ -191,6 +245,7 @@ PARTY_ENRICHMENT = {
     "עוצמה יהודית": {
         "name": "Otzma Yehudit",
         "wing": "far-right",
+        "bloc": "coalition",
         "leader": "Itamar Ben-Gvir",
         "ideology": "Jewish ultranationalism, Kahanism",
         "agenda": "Demands strict law enforcement, increased security spending, annexation of the West Bank, and population transfer policies.",
@@ -205,6 +260,7 @@ PARTY_ENRICHMENT = {
     "עוצמה יהודית בראשות איתמר בן גביר": {
         "name": "Otzma Yehudit",
         "wing": "far-right",
+        "bloc": "coalition",
         "leader": "Itamar Ben-Gvir",
         "ideology": "Jewish ultranationalism, Kahanism",
         "agenda": "Demands strict law enforcement, increased security spending, annexation of the West Bank, and population transfer policies.",
@@ -219,6 +275,7 @@ PARTY_ENRICHMENT = {
     "ישראל ביתנו": {
         "name": "Yisrael Beiteinu",
         "wing": "right",
+        "bloc": "opposition",
         "leader": "Avigdor Lieberman",
         "ideology": "Secular nationalism, right-wing liberalism",
         "agenda": "Promotes universal draft (including ultra-Orthodox), public transport on Shabbat, free market policies, and security hawkishness.",
@@ -233,6 +290,7 @@ PARTY_ENRICHMENT = {
     "רעמ": {
         "name": "United Arab List (Ra'am)",
         "wing": "center-right (Islamist)",
+        "bloc": "arab_parties",
         "leader": "Mansour Abbas",
         "ideology": "Islamism, Arab minority interest advocacy",
         "agenda": "Focuses on developing Arab municipalities, solving crime in Arab sectors, legalizing Negev Bedouin towns, and coalition bargaining.",
@@ -247,6 +305,7 @@ PARTY_ENRICHMENT = {
     'רע"ם': {
         "name": "United Arab List (Ra'am)",
         "wing": "center-right (Islamist)",
+        "bloc": "arab_parties",
         "leader": "Mansour Abbas",
         "ideology": "Islamism, Arab minority interest advocacy",
         "agenda": "Focuses on developing Arab municipalities, solving crime in Arab sectors, legalizing Negev Bedouin towns, and coalition bargaining.",
@@ -261,6 +320,22 @@ PARTY_ENRICHMENT = {
     "חדש-תעאל": {
         "name": "Hadash-Ta'al",
         "wing": "left",
+        "bloc": "arab_parties",
+        "leader": "Ayman Odeh",
+        "ideology": "Democratic socialism, Arab-Jewish joint advocacy",
+        "agenda": "Advocates for Arab minority civil rights, a Palestinian state, labor protection, and socialist economics.",
+        "website": "https://www.hadash.org.il/",
+        "wikipedia_url": "https://en.wikipedia.org/wiki/Hadash%E2%80%93Ta%27al",
+        "source_links": [
+            {"label": "Official Website", "url": "https://www.hadash.org.il/"},
+            {"label": "Wikipedia", "url": "https://en.wikipedia.org/wiki/Hadash%E2%80%93Ta%27al"},
+        ],
+        "data_freshness": "2026-06-15",
+    },
+    'חד"ש-תע"ল': {
+        "name": "Hadash-Ta'al",
+        "wing": "left",
+        "bloc": "arab_parties",
         "leader": "Ayman Odeh",
         "ideology": "Democratic socialism, Arab-Jewish joint advocacy",
         "agenda": "Advocates for Arab minority civil rights, a Palestinian state, labor protection, and socialist economics.",
@@ -275,6 +350,7 @@ PARTY_ENRICHMENT = {
     'חד"ש-תע"ל': {
         "name": "Hadash-Ta'al",
         "wing": "left",
+        "bloc": "arab_parties",
         "leader": "Ayman Odeh",
         "ideology": "Democratic socialism, Arab-Jewish joint advocacy",
         "agenda": "Advocates for Arab minority civil rights, a Palestinian state, labor protection, and socialist economics.",
@@ -289,6 +365,7 @@ PARTY_ENRICHMENT = {
     "העבודה": {
         "name": "The Democrats",
         "wing": "left",
+        "bloc": "opposition",
         "leader": "Yair Golan",
         "ideology": "Social democracy, peace advocacy, secularism",
         "agenda": "Promotes welfare-state economics, religious freedom, civil marriage, LGBT equality, and a two-state solution.",
@@ -303,6 +380,7 @@ PARTY_ENRICHMENT = {
     "מפלגת העבודה הישראלית": {
         "name": "The Democrats",
         "wing": "left",
+        "bloc": "opposition",
         "leader": "Yair Golan",
         "ideology": "Social democracy, peace advocacy, secularism",
         "agenda": "Promotes welfare-state economics, religious freedom, civil marriage, LGBT equality, and a two-state solution.",
@@ -317,6 +395,7 @@ PARTY_ENRICHMENT = {
     "נעם": {
         "name": "Noam",
         "wing": "right",
+        "bloc": "coalition",
         "leader": "Avi Maoz",
         "ideology": "Jewish orthodox conservatism",
         "agenda": "Promotes strict religious family values, opposition to LGBT advocacy in state structures, and Orthodox Jewish education.",
@@ -331,6 +410,7 @@ PARTY_ENRICHMENT = {
     "נעם - בראשות אבי מעוז": {
         "name": "Noam",
         "wing": "right",
+        "bloc": "coalition",
         "leader": "Avi Maoz",
         "ideology": "Jewish orthodox conservatism",
         "agenda": "Promotes strict religious family values, opposition to LGBT advocacy in state structures, and Orthodox Jewish education.",
@@ -345,6 +425,7 @@ PARTY_ENRICHMENT = {
     "הימין הממלכתי": {
         "name": "New Hope (United Right)",
         "wing": "right",
+        "bloc": "coalition",
         "leader": "Gideon Sa'ar",
         "ideology": "National liberalism, security hawkishness",
         "agenda": "Focuses on governance reforms, judicial balance, West Bank settlement support, and educational advancement.",
@@ -356,11 +437,10 @@ PARTY_ENRICHMENT = {
         ],
         "data_freshness": "2026-06-15",
     },
-    # ── 2026 New Parties (26th Knesset election cycle) ────────────────────────
-    # Sources: Wikipedia, Times of Israel, Israel Policy Forum — verified June 2026
     "ביחד": {
         "name": "Together (Beyachad)",
         "wing": "center-right",
+        "bloc": "opposition",
         "leader": "Naftali Bennett",
         "ideology": "National security centrism, liberal democracy",
         "agenda": "Security rebuilding after Oct 7, state commission of inquiry, 1 million aliyah plan, anti-corruption, housing affordability, and restoring public trust in government.",
@@ -377,6 +457,7 @@ PARTY_ENRICHMENT = {
     "ישר": {
         "name": "Yashar",
         "wing": "center",
+        "bloc": "opposition",
         "leader": "Gadi Eisenkot",
         "ideology": "Security pragmatism, moderate conservatism",
         "agenda": "Security sector reform, anti-corruption, centrist governance, rebuilding IDF command culture, and pragmatic diplomacy.",
@@ -478,8 +559,12 @@ async def sync_parties() -> int:
                 if k in name_heb or name_heb in k:
                     enrich = v
                     break
+        
+        # Fallback to AI enrichment if not found in pre-seeded dict
+        if not enrich and settings.openai_api_key:
+            enrich = await enrich_party_via_ai(name_heb)
 
-        name_eng = enrich["name"] if enrich else name_heb
+        name_eng = enrich.get("name", name_heb) if enrich else name_heb
         # Count MK seats for this faction using PositionID 54
         seats = len({
             p.get("PersonID") for p in positions_rows
@@ -491,7 +576,8 @@ async def sync_parties() -> int:
         doc = {
             "name": name_eng,
             "name_hebrew": name_heb,
-            "wing": enrich["wing"] if enrich else "unknown",
+            "wing": enrich.get("wing", "unknown") if enrich else "unknown",
+            "bloc": enrich.get("bloc", "opposition") if enrich else "opposition",
             "seats": seats or 1,
             "leader": enrich.get("leader") if enrich else None,
             "ideology": enrich.get("ideology") if enrich else None,
@@ -501,7 +587,7 @@ async def sync_parties() -> int:
             "wikipedia_url": enrich.get("wikipedia_url") if enrich else None,
             "source_links": enrich.get("source_links", []) if enrich else [],
             "data_freshness": enrich.get("data_freshness") if enrich else None,
-            "data_source_note": "Data sourced from official party websites, Wikipedia, and Knesset.gov.il — not AI-generated.",
+            "data_source_note": "Data enriched via AI and official Knesset records.",
             "updated_at": datetime.utcnow(),
         }
         await db.parties.update_one({"name": name_eng}, {"$set": doc}, upsert=True)
@@ -604,16 +690,27 @@ async def sync_mps(limit: int = 200) -> int:
         ind = individual_by_pid.get(pid) or {}
         photo_url = ind.get("photo_url") or f"https://knesset.gov.il/mk/images/members/{pid}.jpg"
 
+        bio = f"Member of Knesset representing {party_name_eng}."
+        role = "Member of Knesset"
+        career_history = []
+        if settings.openai_api_key:
+            ai_data = await enrich_mp_bio_via_ai(name_eng, party_name_eng)
+            if ai_data:
+                bio = ai_data.get("bio", bio)
+                role = ai_data.get("role", role)
+                career_history = ai_data.get("career_history", [])
+
         mp_doc = {
             "knesset_id": int(pid) if (pid or "").isdigit() else pid,
             "name": name_eng,
             "name_hebrew": name_heb or None,
-            "role": "Member of Knesset",
+            "role": role,
             "is_active": True,
             "party_name": party_name_eng,
             "party_id": str(party_oid) if party_oid else None,
             "photo_url": photo_url,
-            "bio": f"Member of Knesset representing {party_name_eng}.",
+            "bio": bio,
+            "career_history": career_history,
             "updated_at": datetime.utcnow(),
         }
         knesset_id_val = int(pid) if (pid or "").isdigit() else pid
@@ -1371,3 +1468,61 @@ async def get_mp_vote_records(mp_id: str) -> list[dict]:
             query["$or"].append({"knesset_person_id": str(mp["knesset_id"])})
     cursor = db.bill_vote_records.find(query, {"_id": 0, "raw": 0}).sort("vote_date", -1)
     return await cursor.to_list(1000)
+
+async def enrich_party_via_ai(name_heb: str) -> dict:
+    """Use GPT-4o-mini to dynamically enrich an unknown Israeli political party."""
+    if not settings.openai_api_key:
+        return {}
+    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    prompt = f"""
+    You are an expert on Israeli politics. Analyze the following political faction name in Hebrew: "{name_heb}".
+    Provide the following details in standard English as a JSON object:
+    - name: Standard English name of the party (e.g. "Likud", "Shas", "United Torah Judaism", "The Democrats", "National Unity")
+    - wing: "left" | "center" | "right" | "far-right" | "far-left" | "unknown"
+    - bloc: "coalition" | "opposition" | "arab_parties" (in the context of the 25th Knesset / current government)
+    - leader: Current party leader's name in English
+    - ideology: Main ideologies (comma separated)
+    - agenda: 1-2 sentence description of the party's platform/goals
+    - website: Official website URL if known, otherwise null
+    - wikipedia_url: English Wikipedia URL if known, otherwise null
+    
+    Respond ONLY with the JSON object.
+    """
+    try:
+        resp = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0.0,
+        )
+        return json.loads(resp.choices[0].message.content)
+    except Exception as e:
+        logger.warning("AI party enrichment failed for %s: %s", name_heb, e)
+        return {}
+
+
+async def enrich_mp_bio_via_ai(name_eng: str, party_name_eng: str) -> dict:
+    """Use GPT-4o-mini to generate bio and career history for an MK."""
+    if not settings.openai_api_key:
+        return {}
+    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    prompt = f"""
+    Provide a professional bio and political career overview for Israeli Member of Knesset "{name_eng}" representing the party "{party_name_eng}".
+    Respond ONLY with a JSON object:
+    {{
+       "bio": "2-3 sentence overview bio",
+       "role": "Current parliamentary role or position (e.g. Member of Knesset, Minister of Defense, Prime Minister)",
+       "career_history": ["Milestone 1", "Milestone 2", "Milestone 3"]
+    }}
+    """
+    try:
+        resp = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0.1,
+        )
+        return json.loads(resp.choices[0].message.content)
+    except Exception as e:
+        logger.warning("AI MP bio enrichment failed for %s: %s", name_eng, e)
+        return {}
