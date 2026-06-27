@@ -287,6 +287,8 @@ async def get_election_candidates_list() -> dict:
         photo_url = mp.get("photo_url")
         if not photo_url and knesset_id:
             photo_url = f"https://knesset.gov.il/mk/images/members/{knesset_id}.jpg"
+        if not photo_url:
+            photo_url = "https://oknesset.org/static/img/Male_portrait_placeholder_cropped.jpg"
         party_info = next(
             (p for p in ELECTION_2026_PARTIES if p["name"] == mp.get("party_name")), {}
         )

@@ -307,6 +307,36 @@ async def get_party_full_profile(party_id: str) -> Optional[dict]:
     return party
 
 
+def _normalize_mp_profile(mp: dict) -> dict:
+    """Fill missing MP profile fields with safe defaults."""
+    if not mp.get("role"):
+        mp["role"] = "Member of Knesset"
+
+    if not mp.get("photo_url") and mp.get("knesset_id"):
+        mp["photo_url"] = f"https://knesset.gov.il/mk/images/members/{mp['knesset_id']}.jpg"
+    if not mp.get("photo_url"):
+        mp["photo_url"] = "https://oknesset.org/static/img/Male_portrait_placeholder_cropped.jpg"
+
+    if not mp.get("bio"):
+        mp["bio"] = mp.get("bio_quote") or f"Member of Knesset representing {mp.get('party_name', 'their party')}."
+    if not mp.get("bio_quote"):
+        mp["bio_quote"] = mp["bio"]
+
+    if not mp.get("career_history"):
+        mp["career_history"] = [
+            f"Serving in the 25th Knesset as {mp.get('role', 'Member of Knesset')} for {mp.get('party_name', 'their party')}."
+        ]
+
+    if not mp.get("service_years"):
+        mp["service_years"] = "25th Knesset"
+
+    mp["committees"] = mp.get("committees") or []
+    if mp.get("bills_passed_count") is None:
+        mp["bills_passed_count"] = 0
+
+    return mp
+
+
 async def get_mp_full_profile(mp_id: str) -> Optional[dict]:
     """
     Full MP detail page (Screen 4).
@@ -393,7 +423,7 @@ async def get_mp_full_profile(mp_id: str) -> Optional[dict]:
             "type": "Vote",
             "date": bv.get("vote_date", ""),
             "title": f"Voted '{bv.get('vote', 'Unknown').upper()}' on {bv.get('bill_name') or bv.get('bill_id')}",
-            "summary": f"Voting record from Knesset OData.",
+            "summary": "Voting record from Knesset OData.",
         })
     # Add quotes as speeches
     for q in quotes[:3]:
@@ -403,6 +433,25 @@ async def get_mp_full_profile(mp_id: str) -> Optional[dict]:
             "title": f"Statement on {q.get('topic', 'politics')}",
             "summary": (q.get("quote") or "")[:200],
         })
+
+    if not notable_activity and mp.get("career_history"):
+        for idx, history_item in enumerate(mp.get("career_history", [])[:3], start=1):
+            summary_text = history_item if isinstance(history_item, str) else history_item.get("summary") or history_item.get("description") or str(history_item)
+            notable_activity.append({
+                "type": "Career",
+                "date": "",
+                "title": f"Career highlight {idx}",
+                "summary": summary_text,
+            })
+
+    if not notable_activity:
+        notable_activity.append({
+            "type": "Info",
+            "date": "",
+            "title": "No public activity recorded yet",
+            "summary": "No votes, quotes, or actions are currently available for this MP.",
+        })
+
     # Sort by date desc
     notable_activity.sort(key=lambda x: x.get("date") or "", reverse=True)
 
@@ -410,6 +459,7 @@ async def get_mp_full_profile(mp_id: str) -> Optional[dict]:
     if not mp.get("service_years") and not mp.get("bio_quote"):
         mp = await _enrich_mp_from_wikipedia(mp)
 
+    mp = _normalize_mp_profile(mp)
     mp["quotes"] = quotes
     mp["actions"] = actions
     mp["actions_vs_claims"] = actions_vs_claims[:15]
