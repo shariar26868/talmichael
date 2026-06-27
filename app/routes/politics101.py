@@ -30,10 +30,6 @@ router = APIRouter(prefix="/politics-101", tags=["Israeli Politics 101"])
     ),
 )
 async def knesset_sessions(
-    category: Optional[str] = Query(
-        None,
-        description="Filter by type: 'Plenary' | 'Committee' | 'Budget'",
-    ),
     limit: int = Query(20, ge=1, le=50, description="Number of sessions to return"),
     use_ai_refresh: bool = Query(
         False,
@@ -42,7 +38,6 @@ async def knesset_sessions(
 ):
     """Get important Knesset sessions for the Israeli Politics 101 section."""
     return await get_knesset_sessions(
-        category=category,
         limit=limit,
         use_ai_refresh=use_ai_refresh,
     )

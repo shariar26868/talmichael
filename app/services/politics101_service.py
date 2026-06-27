@@ -28,7 +28,7 @@ SEED_SESSIONS = [
     {
         "session_id": "seed_001",
         "date": "2023-10-12",
-        "type": "Plenary Session",
+        "type": "Plenary",
         "title": "Emergency War Cabinet Debate",
         "summary": "Intense arguments regarding the expansion of emergency powers. PM delivered a 40-minute address.",
         "importance": "high",
@@ -39,7 +39,7 @@ SEED_SESSIONS = [
     {
         "session_id": "seed_002",
         "date": "2023-11-05",
-        "type": "Budget Speech",
+        "type": "Budget",
         "title": "Revised National Budget",
         "summary": "Opposition leader contested defense spending allocations. Session lasted until 3 AM.",
         "importance": "high",
@@ -72,7 +72,7 @@ SEED_SESSIONS = [
     {
         "session_id": "seed_005",
         "date": "2025-01-10",
-        "type": "Committee Session",
+        "type": "Committee",
         "title": "Intelligence Oversight Hearing",
         "summary": "Security and Intelligence subcommittee held closed-door hearing on Oct 7 intelligence failures.",
         "importance": "medium",
@@ -83,7 +83,7 @@ SEED_SESSIONS = [
     {
         "session_id": "seed_006",
         "date": "2025-06-01",
-        "type": "Plenary Session",
+        "type": "Plenary",
         "title": "2025–2026 Defense Budget Approval",
         "summary": "NIS 107 billion defense budget approved. Opposition contested allocation priorities for Gaza campaign.",
         "importance": "high",
@@ -233,22 +233,29 @@ SEED_COMMITTEE_ACTIONS = [
 
 
 async def get_knesset_sessions(
-    category: Optional[str] = None,
     limit: int = 20,
     use_ai_refresh: bool = False,
 ) -> dict:
     """
     Return important Knesset sessions.
-    Tries DB first, falls back to seed data.
-    Optionally fetches fresh data via AI summarization.
+    If use_ai_refresh=True: fetch fresh data from AI only.
+    Otherwise: try DB first, then seed data.
     """
     db = get_db()
 
-    # Check DB for stored sessions
-    query = {}
-    if category:
-        query["type"] = {"$regex": category, "$options": "i"}
-    stored = await db.knesset_sessions.find(query, {"_id": 0}).sort("date", -1).limit(limit).to_list(limit)
+    # If AI refresh requested, skip DB and fetch fresh from AI
+    if use_ai_refresh and settings.openai_api_key:
+        ai_sessions = await _fetch_sessions_via_ai()
+        ai_sessions = [_normalize_session_type(s) for s in ai_sessions]
+        return {
+            "total": len(ai_sessions),
+            "sessions": ai_sessions[:limit],
+            "source": "ai",
+        }
+
+    # Otherwise: check DB for stored sessions
+    stored = await db.knesset_sessions.find({}, {"_id": 0}).sort("date", -1).limit(limit).to_list(limit)
+    stored = [_normalize_session_type(s) for s in stored] if stored else []
 
     if stored:
         return {
@@ -257,10 +264,8 @@ async def get_knesset_sessions(
             "source": "database",
         }
 
-    # Fall back to seed data + optionally enrich with AI
+    # Fall back to seed data
     sessions = SEED_SESSIONS.copy()
-    if category:
-        sessions = [s for s in sessions if category.lower() in s.get("type", "").lower()]
 
     # Store seed data in DB for next time
     for session in SEED_SESSIONS:
@@ -270,21 +275,27 @@ async def get_knesset_sessions(
             upsert=True,
         )
 
-    if use_ai_refresh and settings.openai_api_key:
-        ai_sessions = await _fetch_sessions_via_ai()
-        for s in ai_sessions:
-            await db.knesset_sessions.update_one(
-                {"session_id": s.get("session_id")},
-                {"$set": {**s, "updated_at": datetime.utcnow()}},
-                upsert=True,
-            )
-        sessions = sessions + ai_sessions
-
+    sessions = [_normalize_session_type(s) for s in sessions]
     return {
         "total": len(sessions),
         "sessions": sessions[:limit],
         "source": "seed_data",
     }
+
+
+def _normalize_session_type(session: dict) -> dict:
+    """Normalize session type to one of: Plenary, Committee, Budget."""
+    normalized = session.get("type", "")
+    normalized_lower = normalized.lower()
+    if "plenary" in normalized_lower:
+        normalized_type = "Plenary"
+    elif "committee" in normalized_lower:
+        normalized_type = "Committee"
+    elif "budget" in normalized_lower:
+        normalized_type = "Budget"
+    else:
+        normalized_type = normalized if normalized in {"Plenary", "Committee", "Budget"} else "Plenary"
+    return {**session, "type": normalized_type}
 
 
 async def _fetch_sessions_via_ai() -> list[dict]:
@@ -300,7 +311,7 @@ Respond ONLY with a JSON array:
   {
     "session_id": "ai_001",
     "date": "YYYY-MM-DD",
-    "type": "Plenary Session|Committee Session|Budget Speech",
+    "type": "Plenary|Committee|Budget",
     "title": "...",
     "summary": "2-3 sentence factual summary",
     "importance": "high|medium",
