@@ -19,6 +19,7 @@ from app.services.election_voting_service import (
     get_election_timeline,
     get_election_news,
     get_election_candidates_list,
+    get_election_participants,
 )
 
 router = APIRouter(prefix="/elections/2026", tags=["Election 2026"])
@@ -164,3 +165,16 @@ async def election_news(
 async def election_candidates():
     """Get all candidates eligible to run in the 2026 election."""
     return await get_election_candidates_list()
+
+
+@router.get(
+    "/participants",
+    summary="All parties and candidates for the 2026 election",
+    description=(
+        "Returns a combined list of all parties and active candidates for the 2026 election. "
+        "Each item includes a unique id and a type field: 'party' or 'candidate'."
+    ),
+)
+async def election_participants():
+    """Get a unified list of parties and candidates for the 2026 election."""
+    return await get_election_participants()

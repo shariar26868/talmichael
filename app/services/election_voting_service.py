@@ -277,22 +277,26 @@ async def get_election_candidates_list() -> dict:
     # Get all active MPs (they are the potential candidates)
     all_mps = await db.mps.find(
         {"is_active": True},
-        {"_id": 1, "name": 1, "name_hebrew": 1, "party_name": 1, "photo_url": 1, "role": 1}
+        {"_id": 1, "knesset_id": 1, "name": 1, "name_hebrew": 1, "party_name": 1, "photo_url": 1, "role": 1}
     ).sort("name", 1).to_list(200)
 
     candidates = []
     for mp in all_mps:
-        mp["id"] = str(mp.pop("_id"))
-        # Find their party's bloc
+        mp_id = str(mp.get("_id"))
+        knesset_id = mp.get("knesset_id")
+        photo_url = mp.get("photo_url")
+        if not photo_url and knesset_id:
+            photo_url = f"https://knesset.gov.il/mk/images/members/{knesset_id}.jpg"
         party_info = next(
             (p for p in ELECTION_2026_PARTIES if p["name"] == mp.get("party_name")), {}
         )
         candidates.append({
-            "id": mp["id"],
+            "id": mp_id,
+            "type": "candidate",
             "name": mp.get("name"),
             "name_hebrew": mp.get("name_hebrew"),
             "party": mp.get("party_name"),
-            "photo_url": mp.get("photo_url"),
+            "photo_url": photo_url,
             "role": mp.get("role"),
             "bloc": party_info.get("bloc", "opposition"),
         })
@@ -305,5 +309,68 @@ async def get_election_candidates_list() -> dict:
         "total": len(candidates),
         "candidates": candidates,
         "note": "Candidate list sourced from Open Knesset active MP registry.",
+        "data_freshness": "2026-06-15",
+    }
+
+
+async def get_election_participants() -> dict:
+    """
+    Return a unified list of parties and candidates for the 2026 election.
+    Each item has a distinct id and a type field: party or candidate.
+    """
+    # Build party entries
+    parties = [
+        {
+            "id": f"party_{i + 1}",
+            "type": "party",
+            "name": party.get("name"),
+            "name_hebrew": party.get("name_hebrew"),
+            "leader": party.get("leader"),
+            "bloc": party.get("bloc"),
+            "wing": party.get("wing"),
+            "poll_seats_range": party.get("poll_seats_range"),
+            "official_link": party.get("official_link"),
+        }
+        for i, party in enumerate(ELECTION_2026_PARTIES)
+    ]
+
+    # Build candidate entries
+    db = get_db()
+    all_mps = await db.mps.find(
+        {"is_active": True},
+        {"_id": 1, "knesset_id": 1, "name": 1, "name_hebrew": 1, "party_name": 1, "photo_url": 1, "role": 1}
+    ).sort("name", 1).to_list(200)
+
+    candidates = []
+    for mp in all_mps:
+        mp_id = str(mp.get("_id"))
+        knesset_id = mp.get("knesset_id")
+        photo_url = mp.get("photo_url")
+        if not photo_url and knesset_id:
+            photo_url = f"https://knesset.gov.il/mk/images/members/{knesset_id}.jpg"
+        if not photo_url:
+            photo_url = "https://oknesset.org/static/img/Male_portrait_placeholder_cropped.jpg"
+        party_info = next(
+            (p for p in ELECTION_2026_PARTIES if p["name"] == mp.get("party_name")), {}
+        )
+        candidates.append({
+            "id": f"candidate_{mp_id}",
+            "type": "candidate",
+            "name": mp.get("name"),
+            "name_hebrew": mp.get("name_hebrew"),
+            "party": mp.get("party_name"),
+            "photo_url": photo_url,
+            "role": mp.get("role"),
+            "bloc": party_info.get("bloc", "opposition"),
+        })
+
+    participants = parties + candidates
+
+    return {
+        "total": len(participants),
+        "participants": participants,
+        "party_count": len(parties),
+        "candidate_count": len(candidates),
+        "note": "Combined list of all parties and active candidates for the 2026 election.",
         "data_freshness": "2026-06-15",
     }
