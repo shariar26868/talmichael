@@ -869,6 +869,10 @@ async def get_mp(mp_id: str) -> Optional[dict]:
         mp["id"] = mp_id
         mp["quotes"] = await (db.mp_quotes.find({"mp_id": mp_id}, {"_id": 0})).to_list(50)
         mp["actions"] = await (db.mp_actions.find({"mp_id": mp_id}, {"_id": 0})).to_list(50)
+        if "committees" not in mp or not mp["committees"]:
+            mp["committees"] = []
+        if "bills_passed_count" not in mp or mp["bills_passed_count"] is None:
+            mp["bills_passed_count"] = 0
     return mp
 
 
