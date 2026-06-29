@@ -317,6 +317,107 @@ async def _generate_fresh_statistics(use_ai: bool) -> dict:
 
 # ── Route ─────────────────────────────────────────────────────────────────────
 
+@router.get("/statistics/positive")
+async def get_positive_statistics():
+    """Return a curated, infographic-friendly set of positive statistics for the Positive screen."""
+    return {
+        "headline": "Israel’s positive momentum",
+        "summary": "A curated starter set of uplifting social and civic statistics with source links for the Positive screen.",
+        "items": [
+            {
+                "id": "startup_ecosystem",
+                "title": "Israel remains one of the world’s most startup-dense countries",
+                "value": "~4,000 active startups",
+                "description": "The country continues to be recognized for its innovation ecosystem and high concentration of startups.",
+                "source_label": "Startup Nation Central",
+                "source_url": "https://startupnationcentral.org/",
+                "accent": "#2E8B57",
+            },
+            {
+                "id": "tech_workers",
+                "title": "High participation in technology and engineering careers",
+                "value": "Strong engineering talent base",
+                "description": "Israel’s workforce remains highly represented in technological and engineering fields.",
+                "source_label": "OECD / World Bank",
+                "source_url": "https://www.oecd.org/",
+                "accent": "#3B82F6",
+            },
+            {
+                "id": "universities",
+                "title": "World-class university research output",
+                "value": "Leading research institutions",
+                "description": "Israeli universities continue to produce significant research and innovation activity.",
+                "source_label": "Times Higher Education",
+                "source_url": "https://www.timeshighereducation.com/",
+                "accent": "#8B5CF6",
+            },
+            {
+                "id": "social_tech",
+                "title": "Social-tech initiatives are growing across Israeli civil society",
+                "value": "Growing impact sector",
+                "description": "Civic and nonprofit organizations increasingly use technology to advance community services.",
+                "source_label": "Civic tech and nonprofit reports",
+                "source_url": "https://www.un.org/en/",
+                "accent": "#F59E0B",
+            },
+            {
+                "id": "renewable_energy",
+                "title": "Renewable energy adoption is steadily rising",
+                "value": "Growing clean-energy mix",
+                "description": "Israel continues to expand its clean-energy and efficiency investments.",
+                "source_label": "IEA",
+                "source_url": "https://www.iea.org/",
+                "accent": "#10B981",
+            },
+            {
+                "id": "healthcare_tech",
+                "title": "Medical innovation remains a strength",
+                "value": "Strong med-tech ecosystem",
+                "description": "The country’s medical technology sector continues to develop practical solutions for care and health.",
+                "source_label": "Israel Innovation Authority",
+                "source_url": "https://innovationisrael.org.il/",
+                "accent": "#EF4444",
+            },
+            {
+                "id": "education_investment",
+                "title": "Education remains a strategic national priority",
+                "value": "Sustained public investment",
+                "description": "The country continues to invest heavily in STEM education and future skills development.",
+                "source_label": "World Bank",
+                "source_url": "https://www.worldbank.org/",
+                "accent": "#0F766E",
+            },
+            {
+                "id": "volunteering",
+                "title": "Community volunteering and civic participation remain strong",
+                "value": "Active civic ecosystem",
+                "description": "Israeli society continues to show strong volunteer and community engagement.",
+                "source_label": "Israeli voluntary sector reports",
+                "source_url": "https://www.gov.il/en/departments/",
+                "accent": "#6366F1",
+            },
+            {
+                "id": "diaspora_links",
+                "title": "Israel’s global innovation and diaspora networks remain strong",
+                "value": "Strong international linkages",
+                "description": "The country’s innovation economy continues to benefit from deep global partnerships and talent exchange.",
+                "source_label": "World Economic Forum",
+                "source_url": "https://www.weforum.org/",
+                "accent": "#D946EF",
+            },
+            {
+                "id": "resilience",
+                "title": "Israeli society continues to show resilience and adaptability",
+                "value": "High civic resilience",
+                "description": "The country’s institutions and communities continue to adapt quickly during disruptive periods.",
+                "source_label": "OECD / World Bank",
+                "source_url": "https://www.oecd.org/",
+                "accent": "#14B8A6",
+            },
+        ],
+    }
+
+
 @router.get("/statistics", response_model=StatisticsResponse)
 async def get_statistics(
     use_ai: bool = Query(True, description="Use GPT-4o-mini for AI-generated analysis"),

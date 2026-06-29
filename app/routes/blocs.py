@@ -39,6 +39,16 @@ async def get_political_blocs():
 # ── Party Full Profile (Screen 3) ────────────────────────────────────────────
 
 @router.get(
+    "/agenda-comparison",
+    summary="Agenda comparison",
+    description="Returns a horizontal agenda comparison across parties for the Politics screen.",
+)
+async def agenda_comparison(bloc: Optional[str] = Query(None)):
+    """Return the horizontal-scroll agenda comparison table."""
+    return await get_agenda_comparison(bloc=bloc)
+
+
+@router.get(
     "/parties/{party_id}/full-profile",
     summary="Full party profile — Screen 3",
     description=(

@@ -165,8 +165,38 @@ PARTY_AGENDA_TOPICS: dict[str, dict] = {
 }
 
 
+def build_ui_bloc_summary(parties: list[dict]) -> dict:
+    """Return a UI-friendly bloc summary with Arab parties merged into opposition."""
+    coalition_parties = []
+    opposition_parties = []
+    coalition_seats = 0
+    opposition_seats = 0
+
+    for p in parties:
+        bloc = p.get("bloc") or PARTY_BLOC_MAP.get(p.get("name", ""), "opposition")
+        if bloc == "coalition":
+            coalition_parties.append(p)
+            coalition_seats += int(p.get("seats", 0) or 0)
+        else:
+            opposition_parties.append(p)
+            opposition_seats += int(p.get("seats", 0) or 0)
+
+    return {
+        "coalition": {
+            "label": "Coalition",
+            "total_seats": coalition_seats,
+            "parties": coalition_parties,
+        },
+        "opposition": {
+            "label": "Opposition & Arab Parties",
+            "total_seats": opposition_seats,
+            "parties": opposition_parties,
+        },
+    }
+
+
 async def get_blocs() -> dict:
-    """Return all parties grouped by bloc (coalition / opposition / arab_parties)."""
+    """Return all parties grouped by the UI-friendly coalition/opposition view."""
     db = get_db()
     all_parties = await db.parties.find({}, {"_id": 1, "name": 1, "name_hebrew": 1,
                                              "wing": 1, "seats": 1, "leader": 1,
@@ -174,12 +204,7 @@ async def get_blocs() -> dict:
                                              "wikipedia_url": 1, "source_links": 1,
                                              "bloc": 1}).sort("seats", -1).to_list(100)
 
-    coalition_parties = []
-    opposition_parties = []
-    arab_parties = []
-    coalition_seats = 0
-    opposition_seats = 0
-    arab_seats = 0
+    normalized_parties = []
 
     for p in all_parties:
         p["id"] = str(p.pop("_id"))
@@ -197,34 +222,25 @@ async def get_blocs() -> dict:
             p["agenda_by_topic"] = {k: v for k, v in agenda_topics.items()
                                     if k not in ("source_url", "data_freshness")}
 
-        seats = p.get("seats", 0) or 0
-        if bloc == "coalition":
-            coalition_parties.append(p)
-            coalition_seats += seats
-        elif bloc == "arab_parties":
-            arab_parties.append(p)
-            arab_seats += seats
-        else:
-            opposition_parties.append(p)
-            opposition_seats += seats
+        normalized_parties.append(p)
+
+    ui_summary = build_ui_bloc_summary(normalized_parties)
+
+    coalition = ui_summary["coalition"]
+    opposition = ui_summary["opposition"]
 
     return {
         "coalition": {
-            "label": "Coalition Blocks",
-            "total_seats": coalition_seats,
+            "label": coalition["label"],
+            "total_seats": coalition["total_seats"],
             "majority_needed": 61,
-            "has_majority": coalition_seats >= 61,
-            "parties": coalition_parties,
+            "has_majority": coalition["total_seats"] >= 61,
+            "parties": coalition["parties"],
         },
         "opposition": {
-            "label": "Opposition Blocks",
-            "total_seats": opposition_seats,
-            "parties": opposition_parties,
-        },
-        "arab_parties": {
-            "label": "Arab Parties",
-            "total_seats": arab_seats,
-            "parties": arab_parties,
+            "label": opposition["label"],
+            "total_seats": opposition["total_seats"],
+            "parties": opposition["parties"],
         },
         "total_knesset_seats": 120,
         "data_freshness": "2026-06-15",

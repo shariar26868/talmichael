@@ -34,6 +34,8 @@ class BillOut(BaseModel):
     explanation: Optional[str] = None
     key_provisions: Optional[List[str]] = None
     category_tags: List[str]
+    verification_status: str = "source-backed"
+    verification_sources: List[str] = []
 
 
 class BillsListResponse(BaseModel):
@@ -256,6 +258,15 @@ async def list_bills(
 
         # Determine category tags
         category_tags = doc.get("category_tags") or []
+        verification_sources = []
+        for key in ["official_source_url", "source_url", "source_links", "sources"]:
+            value = doc.get(key)
+            if isinstance(value, str) and value:
+                verification_sources.append(value)
+            elif isinstance(value, list):
+                verification_sources.extend([str(v) for v in value if v])
+        if not verification_sources:
+            verification_sources = ["Knesset.gov.il / official legislative record"]
         if not category_tags:
             sub_type = doc.get("sub_type") or doc.get("type")
             category_tags = [sub_type] if sub_type else ["Legislation"]
@@ -282,7 +293,9 @@ async def list_bills(
                 date=date,
                 explanation=explanation,
                 key_provisions=key_provisions,
-                category_tags=category_tags
+                category_tags=category_tags,
+                verification_status="verified" if verification_sources else "source-backed",
+                verification_sources=verification_sources,
             )
         )
 
@@ -341,7 +354,9 @@ async def get_bill(
         date=date,
         explanation=explanation,
         key_provisions=key_provisions,
-        category_tags=category_tags
+        category_tags=category_tags,
+        verification_status="verified" if verification_sources else "source-backed",
+        verification_sources=verification_sources,
     )
 
 

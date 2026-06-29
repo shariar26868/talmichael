@@ -48,6 +48,20 @@ from app.utils.image_enricher import enrich_images
 logger = logging.getLogger(__name__)
 
 
+def normalize_language(language: Optional[str]) -> str:
+    """Normalize the requested UI language to a supported backend language."""
+    if not language:
+        return "hebrew"
+    lang = str(language).strip().lower()
+    if lang in {"he", "hebrew", "iw", "iwrit"}:
+        return "hebrew"
+    if lang in {"en", "eng", "english"}:
+        return "english"
+    if lang in {"ar", "arabic", "arab", "arabe"}:
+        return "arabic"
+    return "hebrew"
+
+
 # ── HTTP headers shared across all fetches ─────────────────────────────────────
 _HEADERS = {
     "User-Agent": (
@@ -135,7 +149,7 @@ async def fetch_news(
     exclude_negative: bool = False,
     use_cache: bool = True,
     with_analysis: bool = False,
-    language: str = "english",
+    language: Optional[str] = None,
     user_tier: str = "free",
     source_type: Optional[Literal["israel", "global"]] = None,  # Kept for compat; ignored
 ) -> NewsResponse:
@@ -151,19 +165,21 @@ async def fetch_news(
     • Articles are tagged with source_type="israel" | "global" so clients can
       still filter/display by origin if desired.
     """
+    normalized_language = normalize_language(language)
+
     # ── Cache key (include category, limit, language, tier, analysis) ─────────
     if use_cache:
-        key = news_key(category, limit, False, exclude_negative, language, user_tier, with_analysis)
+        key = news_key(category, limit, False, exclude_negative, normalized_language, user_tier, with_analysis)
         cached = await cache_get(key)
         if cached:
             return NewsResponse(**cached)
 
     # ── Step 1: Build mixed source list ───────────────────────────────────────
-    sources_to_fetch = _build_mixed_source_list(category, language)
+    sources_to_fetch = _build_mixed_source_list(category, normalized_language)
 
-    # Limit parallel requests: top 30 sources max to keep latency acceptable
-    MAX_SOURCES = 30
-    per_source_limit = max(5, limit // max(1, min(len(sources_to_fetch), MAX_SOURCES)))
+    # Limit parallel requests and keep latency under control while still returning enough articles.
+    MAX_SOURCES = 18
+    per_source_limit = max(4, min(8, (limit // 3) + 2))
     selected_sources = list(sources_to_fetch.items())[:MAX_SOURCES]
 
     logger.info(

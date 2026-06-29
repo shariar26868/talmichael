@@ -5,6 +5,7 @@ from datetime import datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.database import init_db, close_db
 from app.routes.news import router as news_router
@@ -22,6 +23,7 @@ from app.routes.summary import router as summary_router
 from app.routes.blocs import router as blocs_router
 from app.routes.politics101 import router as politics101_router
 from app.routes.election_voting import router as election_voting_router
+from app.routes.pulse import router as pulse_router
 
 
 @asynccontextmanager
@@ -40,6 +42,8 @@ app = FastAPI(
     version="3.0.0",
     lifespan=lifespan,
 )
+
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 app.add_middleware(
     CORSMiddleware,
@@ -63,13 +67,20 @@ app.include_router(statistics_router)
 app.include_router(summary_router)
 app.include_router(politics101_router)
 app.include_router(election_voting_router)
+app.include_router(pulse_router)
 
 
 
 
 @app.get("/", tags=["Health"])
 async def root():
-    return {"status": "ok", "version": "3.0.0", "docs": "/docs"}
+    return {
+        "status": "ok",
+        "version": "3.0.0",
+        "docs": "/docs",
+        "default_language": "hebrew",
+        "logo_url": "/static/logo.svg",
+    }
 
 
 @app.get("/health", tags=["Health"])

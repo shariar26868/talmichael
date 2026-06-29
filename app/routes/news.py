@@ -114,7 +114,7 @@ async def international(
     return await fetch_news(
         "international", limit,
         exclude_negative=True,
-        language="english",
+        language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
     )
@@ -132,7 +132,7 @@ async def economy(
     """
     return await fetch_news(
         "economy", limit,
-        language="english",
+        language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
     )
@@ -150,7 +150,7 @@ async def defence(
     """
     return await fetch_news(
         "defence", limit,
-        language="english",
+        language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
     )
@@ -168,7 +168,7 @@ async def education(
     """
     return await fetch_news(
         "education", limit,
-        language="english",
+        language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
     )
@@ -188,7 +188,7 @@ async def community(
     return await fetch_news(
         "community", limit,
         exclude_negative=exclude_negative,
-        language="english",
+        language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
     )
@@ -209,7 +209,7 @@ async def political(
     return await fetch_news(
         "political", limit,
         exclude_negative=exclude_negative,
-        language="english",
+        language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
     )
@@ -228,7 +228,7 @@ async def positive(
     return await fetch_news(
         "positive", limit,
         exclude_negative=True,
-        language="english",
+        language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
     )
@@ -247,7 +247,7 @@ async def sport(
     """
     return await fetch_news(
         "sport", limit,
-        language="english",
+        language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
     )
@@ -265,7 +265,7 @@ async def culture(
     """
     return await fetch_news(
         "culture", limit,
-        language="english",
+        language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
     )
@@ -283,7 +283,7 @@ async def environment(
     """
     return await fetch_news(
         "environment", limit,
-        language="english",
+        language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
     )
@@ -301,7 +301,7 @@ async def science(
     """
     return await fetch_news(
         "science", limit,
-        language="english",
+        language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
     )
