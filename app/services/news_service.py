@@ -142,6 +142,49 @@ def _build_mixed_source_list(category: str, language: str) -> dict[str, str]:
     return sources
 
 
+def _select_sources_for_fetch(
+    source_map: dict[str, str],
+    category: str,
+    language: str,
+    max_sources: int = 24,
+) -> list[tuple[str, str]]:
+    """Order source feeds so global categories receive meaningful international coverage."""
+    if not source_map:
+        return []
+
+    israeli_names = set(ISRAELI_SOURCES_FEEDS)
+    international_names = set(INTERNATIONAL_SOURCES_FEEDS)
+    arabic_names = set(ARABIC_SOURCES_FEEDS)
+
+    source_items = list(source_map.items())
+    israeli = [(name, url) for name, url in source_items if name in israeli_names]
+    international = [(name, url) for name, url in source_items if name in international_names]
+    arabic = [(name, url) for name, url in source_items if name in arabic_names]
+
+    used_names = {name for name, _ in israeli} | {name for name, _ in international} | {name for name, _ in arabic}
+    topic = [(name, url) for name, url in source_items if name not in used_names]
+
+    if language.lower() == "arabic":
+        priority_groups = [arabic, israeli, topic]
+    elif category in {"international", "positive", "community", "science", "education"}:
+        priority_groups = [international, topic, israeli]
+    else:
+        priority_groups = [topic, international, israeli]
+
+    selected: list[tuple[str, str]] = []
+    seen_names: set[str] = set()
+    for group in priority_groups:
+        for name, url in group:
+            if name in seen_names:
+                continue
+            selected.append((name, url))
+            seen_names.add(name)
+            if len(selected) >= max_sources:
+                return selected
+
+    return selected[:max_sources]
+
+
 async def fetch_news(
     category: str,
     limit: int,
@@ -177,10 +220,15 @@ async def fetch_news(
     # ── Step 1: Build mixed source list ───────────────────────────────────────
     sources_to_fetch = _build_mixed_source_list(category, normalized_language)
 
-    # Limit parallel requests and keep latency under control while still returning enough articles.
-    MAX_SOURCES = 18
-    per_source_limit = max(4, min(8, (limit // 3) + 2))
-    selected_sources = list(sources_to_fetch.items())[:MAX_SOURCES]
+    # Limit parallel requests while keeping global coverage broad enough for the app.
+    MAX_SOURCES = min(24, max(18, limit + 4))
+    per_source_limit = max(5, min(10, (limit // 3) + 3))
+    selected_sources = _select_sources_for_fetch(
+        sources_to_fetch,
+        category=category,
+        language=normalized_language,
+        max_sources=MAX_SOURCES,
+    )
 
     logger.info(
         f"[{category}] Fetching from {len(selected_sources)} mixed sources "
