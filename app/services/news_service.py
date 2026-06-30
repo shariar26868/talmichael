@@ -97,6 +97,33 @@ def _apply_fact_check_fallbacks(article) -> None:
             }
 
 
+def _category_placeholder_image(category: str) -> str:
+    label = f"{category.title()} News"
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">'
+        '<defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1">'
+        '<stop offset="0%" stop-color="#111827"/>'
+        '<stop offset="100%" stop-color="#374151"/>'
+        '</linearGradient></defs>'
+        '<rect width="1200" height="675" fill="url(#g)"/>'
+        '<text x="50%" y="44%" fill="#f9fafb" font-family="Inter,Arial,Helvetica,sans-serif" '
+        'font-size="72" font-weight="700" text-anchor="middle">'
+        f"{label}"
+        '</text>'
+        '<text x="50%" y="56%" fill="#d1d5db" font-family="Inter,Arial,Helvetica,sans-serif" '
+        'font-size="36" text-anchor="middle">Professional news imagery</text>'
+        '</svg>'
+    )
+    return "data:image/svg+xml;charset=UTF-8," + quote(svg, safe="")
+
+
+def _apply_category_placeholders(articles: list, category: str) -> None:
+    placeholder = _category_placeholder_image(category)
+    for article in articles:
+        if not getattr(article, "image_url", None):
+            article.image_url = placeholder
+
+
 # ── HTTP headers shared across all fetches ─────────────────────────────────────
 _HEADERS = {
     "User-Agent": (
@@ -330,6 +357,7 @@ async def fetch_news(
     # Fetch og:image for articles missing image_url (e.g. Al Jazeera, Middle East Eye).
     # Runs concurrently with semaphore; results are cached per-URL for 1 hour.
     final_articles = await enrich_images(final_articles)
+    _apply_category_placeholders(final_articles, category)
 
     # Count how many are Israeli vs global for metadata
     israel_count = sum(1 for a in final_articles if getattr(a, "source_type", "") == "israel")
