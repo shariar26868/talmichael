@@ -244,7 +244,22 @@ async def get_blocs() -> dict:
         },
         "total_knesset_seats": 120,
         "data_freshness": "2026-06-15",
-        "source": "Open Knesset CSV + Wikipedia — not AI-generated",
+        "source": (
+            "Seat counts: bechirot.gov.il (Central Elections Committee) — "
+            "25th Knesset election night results (1 Nov 2022). "
+            "Party metadata: official party websites + Wikipedia. "
+            "NOT AI-generated."
+        ),
+        "data_verification_url": "https://www.bechirot.gov.il/",
+        "coalition_note": (
+            "Coalition seat counts reflect the 25th Knesset election results (Nov 2022): "
+            "Likud 32 + Shas 11 + UTJ 7 + Religious Zionism 7 + Otzma Yehudit 6 + "
+            "New Hope 4 + Noam 1 = 64 seats total. "
+            "⚠️ Otzma Yehudit (6 seats) left the coalition in January 2025 over the Gaza ceasefire. "
+            "Current coalition strength is approximately 50–56 seats as of mid-2026."
+        ),
+
+
     }
 
 

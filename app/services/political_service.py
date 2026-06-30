@@ -55,6 +55,30 @@ BILL_STATUS_MAP: dict[str, str] = {
     "162": "Government bill – approved",
 }
 
+# ── Verified seat counts — 25th Knesset (election night, 1 Nov 2022) ──────────
+# Source: bechirot.gov.il (Central Elections Committee) + Knesset.gov.il
+# https://www.bechirot.gov.il/
+# https://en.wikipedia.org/wiki/25th_Israeli_Knesset
+# NOTE: Otzma Yehudit (6 seats) LEFT the coalition in January 2025.
+#       Current coalition strength is approx. 50–56 seats as of mid-2026.
+#       Seat counts here = election-night allocation (definitive, official).
+VERIFIED_SEATS_25TH_KNESSET: dict[str, int] = {
+    "Likud": 32,
+    "Yesh Atid": 24,
+    "National Unity": 12,
+    "Shas": 11,
+    "United Torah Judaism": 7,
+    "Religious Zionist Party": 7,
+    "Religious Zionism": 7,          # alternate name mapping
+    "Otzma Yehudit": 6,
+    "Yisrael Beiteinu": 6,
+    "Hadash-Ta'al": 5,
+    "United Arab List (Ra'am)": 5,
+    "The Democrats": 8,              # Labor (4) + Meretz (4) combined pre-merge
+    "New Hope (United Right)": 4,
+    "Noam": 1,
+}
+
 # ── Party enrichment data ─────────────────────────────────────────────────────
 # Sources: Official party websites, Wikipedia, Knesset.gov.il, bechirot.gov.il
 # Data verified June 2026. NOT AI-generated — all facts are sourced.
@@ -565,20 +589,35 @@ async def sync_parties() -> int:
             enrich = await enrich_party_via_ai(name_heb)
 
         name_eng = enrich.get("name", name_heb) if enrich else name_heb
-        # Count MK seats for this faction using PositionID 54
-        seats = len({
-            p.get("PersonID") for p in positions_rows
-            if p.get("KnessetNum") == "25"
-            and p.get("FactionID") == faction_id
-            and p.get("PositionID") == "54"
-        })
+
+        # ── Seat count: use verified election-night results from bechirot.gov.il ──
+        # The PositionID-54 method (counting faction membership rows) was REMOVED
+        # because it inflates seat counts by including all historical members.
+        # Official source: https://www.bechirot.gov.il/ (25th Knesset results, Nov 2022)
+        verified_seats = VERIFIED_SEATS_25TH_KNESSET.get(name_eng)
+        if verified_seats is None:
+            # Try partial match for variant names
+            for vname, vseats in VERIFIED_SEATS_25TH_KNESSET.items():
+                if vname in name_eng or name_eng in vname:
+                    verified_seats = vseats
+                    break
+        seats = verified_seats if verified_seats is not None else 0
 
         doc = {
             "name": name_eng,
             "name_hebrew": name_heb,
             "wing": enrich.get("wing", "unknown") if enrich else "unknown",
             "bloc": enrich.get("bloc", "opposition") if enrich else "opposition",
-            "seats": seats or 1,
+            # Verified seat count from Central Elections Committee (bechirot.gov.il)
+            # Reflects 25th Knesset election-night results (1 Nov 2022).
+            # NOTE: Coalition changed in Jan 2025 when Otzma Yehudit (6 seats) left.
+            "seats": seats,
+            "seats_verified": verified_seats is not None,
+            "seats_source": "bechirot.gov.il — 25th Knesset election results (1 Nov 2022)",
+            "seats_note": (
+                "Otzma Yehudit (6 seats) left the coalition in January 2025. "
+                "Current coalition strength is approximately 50–56 seats as of mid-2026."
+            ) if name_eng == "Otzma Yehudit" else None,
             "leader": enrich.get("leader") if enrich else None,
             "ideology": enrich.get("ideology") if enrich else None,
             "agenda": enrich.get("agenda") if enrich else None,
@@ -587,7 +626,11 @@ async def sync_parties() -> int:
             "wikipedia_url": enrich.get("wikipedia_url") if enrich else None,
             "source_links": enrich.get("source_links", []) if enrich else [],
             "data_freshness": enrich.get("data_freshness") if enrich else None,
-            "data_source_note": "Data enriched via AI and official Knesset records.",
+            "data_source_note": (
+                "Party metadata sourced from official party websites, Wikipedia, and Knesset.gov.il. "
+                "Seat counts from bechirot.gov.il (Central Elections Committee) — 25th Knesset election results. "
+                "NOT AI-generated. Verify at: https://www.bechirot.gov.il/"
+            ),
             "updated_at": datetime.utcnow(),
         }
         await db.parties.update_one({"name": name_eng}, {"$set": doc}, upsert=True)

@@ -636,6 +636,94 @@ ELECTION_2026_SOURCES = [
         "reliability": "high — sourced from all Israeli pollsters",
         "bias_note": "neutral — aggregated data",
     },
+
+    # ── POLITICIAN QUOTES ────────────────────────────────────────────────────
+    {
+        "name": "Hebrew Wikiquote — Israeli Politicians",
+        "description": (
+            "Hebrew-language Wikiquote repository of verified quotes by Israeli politicians. "
+            "Community-edited with source citations. Useful for sourcing direct statements "
+            "by MKs and ministers without relying on AI paraphrasing."
+        ),
+        "url": "https://he.wikiquote.org/wiki/",
+        "type": "quotes_repository",
+        "language": "Hebrew",
+        "reliability": "high — community edited with citations",
+        "bias_note": "neutral — direct quotes with source attribution",
+        "usage_note": "Use for politician direct quotes. Always verify quote source link.",
+    },
+
+    # ── NON-PARTISAN PARLIAMENTARY DATA ──────────────────────────────────────
+    {
+        "name": "Open Knesset (כנסת פתוחה)",
+        "description": (
+            "Non-partisan, open-data project providing factual analysis of Israeli politics, "
+            "parties, and politicians. Data is sourced daily from the Knesset's official OData API "
+            "and made accessible via CSV pipelines. Covers MK profiles, faction membership, "
+            "committee participation, and voting records."
+        ),
+        "url": "https://oknesset.org",
+        "data_url": "https://production.oknesset.org/pipelines/data/",
+        "type": "parliamentary_data",
+        "language": "Hebrew / English (data files)",
+        "reliability": "very high — sourced from official Knesset OData API",
+        "bias_note": "neutral — non-partisan data project",
+        "usage_note": "Primary source for MK profiles, faction data, and voting records in this app.",
+    },
+
+    # ── OFFICIAL PARTY REGISTRY ───────────────────────────────────────────────
+    {
+        "name": "Registrar of Political Parties (רשם המפלגות)",
+        "description": (
+            "Official Israeli government registry of all legally registered political parties. "
+            "The authoritative source for party registration status, official party names, "
+            "and founding documents. Maintained by the Ministry of Justice."
+        ),
+        "url": "https://www.gov.il/he/departments/topics/the_registrar_of_political_parties",
+        "type": "official_government",
+        "language": "Hebrew",
+        "reliability": "authoritative",
+        "bias_note": "neutral — official government registry",
+        "usage_note": "Use to verify whether a party is officially registered. Especially relevant for new 2026 election parties.",
+    },
+
+    # ── STATISTICAL DATA (HIGHEST IMPORTANCE) ────────────────────────────────
+    {
+        "name": "Central Bureau of Statistics — Israel (CBS) | English",
+        "description": (
+            "Israel's official statistical authority. The single most important source for "
+            "verified demographic, economic, and social data relevant to political analysis. "
+            "Covers population data, household income, employment, housing prices, "
+            "Arab-sector demographics, and voter turnout statistics. "
+            "Highest-confidence factual data — not subject to editorial bias."
+        ),
+        "url": "https://www.cbs.gov.il/en",
+        "type": "official_statistics",
+        "language": "English",
+        "reliability": "authoritative — highest confidence",
+        "bias_note": "neutral — official statistical body",
+        "usage_note": (
+            "SUPER IMPORTANT. Use for any claim about population, economy, housing, or demographics. "
+            "Always cite this source when presenting statistical figures in the Politics section."
+        ),
+    },
+    {
+        "name": "Central Bureau of Statistics — Israel (CBS) | Hebrew",
+        "description": (
+            "Hebrew version of Israel's official CBS. Contains additional datasets and reports "
+            "not always available in English. Useful for detailed breakdowns of electoral "
+            "district demographics, Arab and Haredi population data, and economic indicators."
+        ),
+        "url": "https://www.cbs.gov.il",
+        "type": "official_statistics",
+        "language": "Hebrew",
+        "reliability": "authoritative — highest confidence",
+        "bias_note": "neutral — official statistical body",
+        "usage_note": (
+            "SUPER IMPORTANT. Search in Hebrew for datasets not available in the English version. "
+            "Primary reference for any demographic or economic data used in political context."
+        ),
+    },
 ]
 
 
