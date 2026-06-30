@@ -2,7 +2,7 @@
 """
 Bloc & Party Full-Profile Routes.
 Covers Screen 1 (Coalition vs. Opposition), Screen 2 (Agenda Comparison),
-and Screen 3 (Individual Party Detail Page).
+Screen 3 (Individual Party Detail Page), and the Trusted Source Verification endpoints.
 """
 
 from typing import Optional
@@ -16,6 +16,13 @@ from app.services.blocs_service import (
     get_agenda_comparison,
     sync_party_agendas,
 )
+from app.services.political_service import backfill_party_verification
+from app.services.political_verification_service import (
+    build_full_party_verification_report,
+    cross_check_party_via_wikipedia,
+    TRUSTED_SOURCES,
+)
+from app.core.database import get_db
 
 router = APIRouter(prefix="/political", tags=["Blocs & Party Profiles"])
 
@@ -126,3 +133,197 @@ async def sync_agendas_now():
     """Run agenda sync synchronously and return the result."""
     result = await sync_party_agendas()
     return result
+
+
+# ── Backfill / Migration ──────────────────────────────────────────────────────
+
+@router.post(
+    "/parties/backfill-verification",
+    summary="Backfill verification fields on existing party docs",
+    description=(
+        "Patches all existing party documents in MongoDB with verified_by[], "
+        "verification_score, verification_label, verification_badge, seats, "
+        "seats_source, and a live Wikipedia cross-check result. "
+        "Run this once after deploying the verification code — no CSV download needed. "
+        "Takes ~20–30 seconds (one Wikipedia API call per party)."
+    ),
+    tags=["Admin Sync", "Trusted Sources"],
+)
+async def backfill_verification():
+    """Fast in-place patch for stale party documents. No CSV sync needed."""
+    result = await backfill_party_verification()
+    return result
+
+
+# ── Trusted Source Verification Routes ───────────────────────────────────────
+
+@router.get(
+    "/sources/trusted",
+    summary="Trusted sources registry",
+    description=(
+        "Returns the full registry of 7 trusted sources used for Politics & Bills data. "
+        "Each source includes: reliability rating, bias note, type, and usage notes. "
+        "Use this to show users which sources back each data point."
+    ),
+    tags=["Trusted Sources"],
+)
+async def trusted_sources_registry():
+    """Return the canonical list of trusted data sources."""
+    return {
+        "total": len(TRUSTED_SOURCES),
+        "sources": list(TRUSTED_SOURCES.values()),
+        "data_integrity_note": (
+            "All political facts are sourced from the listed verified databases. "
+            "AI is used ONLY for translation and biography text — never for political facts "
+            "like seat counts, coalition status, or bill status."
+        ),
+    }
+
+
+@router.get(
+    "/parties/verification-summary",
+    summary="Verification badges for all parties",
+    description=(
+        "Returns a compact list of all parties with their verification_badge, "
+        "verification_score, and cross_check summary. "
+        "Use this to display source-trust indicators on the main party list screen."
+    ),
+    tags=["Trusted Sources"],
+)
+async def parties_verification_summary():
+    """Get verification badges for all parties — one row per party."""
+    db = get_db()
+    parties = await db.parties.find(
+        {},
+        {
+            "_id": 1,
+            "name": 1,
+            "verification_score": 1,
+            "verification_label": 1,
+            "verification_badge": 1,
+            "cross_check_result": 1,
+            "verified_by": 1,
+            "seats_source": 1,
+        },
+    ).sort("name", 1).to_list(50)
+
+    result = []
+    for p in parties:
+        p["id"] = str(p.pop("_id"))
+        cross = p.get("cross_check_result") or {}
+        result.append({
+            "id": p["id"],
+            "name": p.get("name"),
+            "verification_score": p.get("verification_score", 0),
+            "verification_label": p.get("verification_label", "unverified"),
+            "badge": p.get("verification_badge", {}),
+            "sources_count": len(p.get("verified_by", [])),
+            "sources": [v.get("source_name") for v in p.get("verified_by", [])],
+            "wikipedia_cross_check": cross.get("agreement_label") if cross.get("checked") else "not_run",
+            "seats_source": p.get("seats_source"),
+        })
+
+    return {
+        "total": len(result),
+        "parties": result,
+        "note": (
+            "Run POST /political/sync/oknesset to refresh verification data. "
+            "Wikipedia cross-checks run automatically during sync."
+        ),
+    }
+
+
+@router.get(
+    "/parties/{party_id}/verification",
+    summary="Full verification report for a party",
+    description=(
+        "Returns the complete trusted-source verification report for one party. "
+        "Includes: verified_by[] list (which source verified which field), "
+        "live Wikipedia cross-check result (leader + seat count comparison), "
+        "verification badge for UI display, and the full trusted sources registry. "
+        "Use this for the party detail page 'Data Sources' panel."
+    ),
+    tags=["Trusted Sources"],
+)
+async def party_verification_report(party_id: str):
+    """Get full trusted-source verification report for a single party."""
+    db = get_db()
+    from bson import ObjectId
+    try:
+        oid = ObjectId(party_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid party_id format")
+
+    party = await db.parties.find_one({"_id": oid})
+    if not party:
+        raise HTTPException(status_code=404, detail="Party not found")
+
+    name_eng = party.get("name", "")
+    verified_by = party.get("verified_by", [])
+    verification_score = party.get("verification_score", 0)
+    verification_label = party.get("verification_label", "unverified")
+    cross_check_result = party.get("cross_check_result")
+
+    return build_full_party_verification_report(
+        name_eng=name_eng,
+        verified_by=verified_by,
+        verification_score=verification_score,
+        verification_label=verification_label,
+        cross_check_result=cross_check_result,
+    )
+
+
+@router.post(
+    "/verify",
+    summary="Trigger live cross-check for all parties",
+    description=(
+        "Runs a live Wikipedia cross-check for every party in the database. "
+        "Compares stored leader name and seat count against Wikipedia summary text. "
+        "Detects and stores agreements and divergences. "
+        "Results are stored in MongoDB and returned immediately. "
+        "Typically takes 15–30 seconds for all parties."
+    ),
+    tags=["Trusted Sources", "Admin Sync"],
+)
+async def run_party_cross_checks():
+    """Live cross-check all parties against Wikipedia. Stores divergences."""
+    db = get_db()
+    parties = await db.parties.find(
+        {},
+        {"_id": 1, "name": 1, "leader": 1, "seats": 1, "wikipedia_url": 1},
+    ).to_list(50)
+
+    results = []
+    for party in parties:
+        pid = party["_id"]
+        name_eng = party.get("name", "")
+        result = await cross_check_party_via_wikipedia(
+            name_eng=name_eng,
+            stored_leader=party.get("leader"),
+            stored_seats=party.get("seats", 0),
+            wikipedia_url=party.get("wikipedia_url"),
+        )
+        # Persist updated cross_check_result
+        await db.parties.update_one(
+            {"_id": pid},
+            {"$set": {"cross_check_result": result}},
+        )
+        results.append({
+            "party": name_eng,
+            "checked": result.get("checked"),
+            "agreement_label": result.get("agreement_label"),
+            "agreements": result.get("agreements", []),
+            "divergences": result.get("divergences", []),
+        })
+
+    verified_count = sum(1 for r in results if r.get("checked"))
+    divergence_count = sum(1 for r in results if r.get("divergences"))
+
+    return {
+        "status": "complete",
+        "total_parties": len(results),
+        "wikipedia_checked": verified_count,
+        "parties_with_divergences": divergence_count,
+        "results": results,
+        "note": "Divergences indicate mismatches between stored data and Wikipedia text. Always verify at the source URL.",
+    }
