@@ -335,7 +335,7 @@ async def fetch_news(
             continue
         # 🔑 TOPIC RELEVANCE — this is the key guard that keeps content on-topic
         # across ALL sources (both Israeli general news and global general news)
-        if not is_topic_relevant(category, a.title, a.description):
+        if not is_topic_relevant(category, a.title, a.description, a.source, a.source_url):
             continue
         filtered.append(a)
 

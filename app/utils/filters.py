@@ -333,6 +333,8 @@ def is_topic_relevant(
     category: str,
     title: Optional[str],
     description: Optional[str] = None,
+    source_name: Optional[str] = None,
+    source_url: Optional[str] = None,
 ) -> bool:
     """
     Check if an article is relevant to the given topic/category.
@@ -364,5 +366,16 @@ def is_topic_relevant(
     # If any excluded keyword matches, reject
     if any(kw in text for kw in excluded):
         return False
+
+    if category == "positive":
+        if source_name or source_url:
+            if not is_israeli_source(source_name, source_url):
+                israel_terms = [
+                    "israel", "israeli", "jerusalem", "tel aviv", "haifa",
+                    "beersheva", "knesset", "idf", "netanyahu", "benjamin",
+                    "jerusalem", "gaza", "west bank",
+                ]
+                if not any(term in text for term in israel_terms):
+                    return False
 
     return True
