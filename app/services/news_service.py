@@ -62,6 +62,41 @@ def normalize_language(language: Optional[str]) -> str:
     return "hebrew"
 
 
+def _infer_fact_check_label(score: float) -> str:
+    if score >= 0.85:
+        return "highly_verified"
+    if score >= 0.70:
+        return "verified"
+    if score >= 0.55:
+        return "partially_verified"
+    if score >= 0.40:
+        return "needs_review"
+    return "disputed"
+
+
+def _apply_fact_check_fallbacks(article) -> None:
+    if getattr(article, "fact_check_percentage", None) is None:
+        score = getattr(article, "fact_check_score", None)
+        if score is not None:
+            try:
+                percent = float(score) * 100.0
+                article.fact_check_percentage = percent
+            except Exception:
+                pass
+
+    if getattr(article, "fact_check_details", None) is None:
+        pct = getattr(article, "fact_check_percentage", None)
+        if pct is not None:
+            article.fact_check_details = {
+                "label": _infer_fact_check_label(float(pct) / 100.0),
+                "components": {},
+                "explanation": (
+                    "Estimated from the article's fact_check_score until full analysis details "
+                    "are available."
+                ),
+            }
+
+
 # ── HTTP headers shared across all fetches ─────────────────────────────────────
 _HEADERS = {
     "User-Agent": (
@@ -345,6 +380,10 @@ async def fetch_news(
                     pass
     except Exception:
         pass
+
+    # ── Step 6.5: Fallback immediate fact-check fields from existing score ───
+    for a in news.articles:
+        _apply_fact_check_fallbacks(a)
 
     # ── Step 7: Optional AI analysis ─────────────────────────────────────────
     if with_analysis and news.articles:
