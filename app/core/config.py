@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     perplexity_api_key: str = ""
     gemini_api_key: str = ""
     claude_api_key: str = ""
+    youtube_api_key: str = ""  # Optional — YouTube Data API v3 key
 
     # External fact-check APIs
     google_factcheck_api_key: str = ""
