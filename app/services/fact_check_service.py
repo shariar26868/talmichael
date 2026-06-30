@@ -14,7 +14,7 @@ Also includes framing analysis (headline vs body, attribution, perspective).
 import logging
 import re
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # Patterns that signal a verifiable claim
 _NUMBER_PATTERN = re.compile(
-    r"\b\d[\d,.]*\s*(?:%|percent|billion|million|thousand|shekel|NIS|USD|\$|₪)\b",
+    r"\b\d[\d,.]*\s*(?:%|percent|billion|million|thousand|shekel|NIS|USD|\$|₪)(?=\s|$|[.,;:!?])",
     re.IGNORECASE,
 )
 _QUOTE_PATTERN = re.compile(r'"([^"]{10,200})"')
@@ -351,6 +351,7 @@ async def compute_verification_confidence(
     claims: Optional[list[VerifiedClaim]] = None,
     framing: Optional[FramingAnalysis] = None,
     cross_source: Optional[dict] = None,
+    external_evidence: Optional[list[dict[str, Any]]] = None,
     user_vote_credibility: Optional[float] = None,
 ) -> VerificationConfidence:
     """Compute a composite verification confidence score from all signals.
@@ -402,6 +403,13 @@ async def compute_verification_confidence(
         weighted_sum += agreement * 0.2
         total_weight += 0.2
 
+    # External fact-check evidence
+    if external_evidence:
+        evidence_score = min(1.0, 0.4 + 0.15 * len(external_evidence))
+        components["external_fact_check"] = round(evidence_score, 2)
+        weighted_sum += evidence_score * 0.15
+        total_weight += 0.15
+
     # User consensus
     if user_vote_credibility is not None:
         components["user_consensus_credibility"] = round(user_vote_credibility, 2)
@@ -431,3 +439,150 @@ async def compute_verification_confidence(
         label=label,
         explanation=explanation,
     )
+
+
+async def analyze_and_store_article(article: dict) -> VerificationConfidence:
+    """Full article-level analysis: extract claims, verify them, compute composite score,
+    and persist results into MongoDB collections (verified_claims, framing_analyses,
+    analysis_audit_log) and update the cached_articles document with the overall
+    `fact_check_percentage` and a breakdown.
+
+    Works without Google Fact Check API by using internal claim verification,
+    source credibility, and cross-source agreement.
+    """
+    try:
+        db = get_db()
+        guid = article.get("guid") or article.get("link")
+        title = article.get("title", "")
+        description = article.get("description", "")
+        source = article.get("source") or "unknown"
+
+        # 1) Extract & verify claims
+        claims = await verify_article_claims(title, description, guid)
+
+        # 2) Framing analysis
+        framing = analyze_framing(title, description)
+
+        # 3) Cross-source verification (simple lookup from cross_source_matches)
+        cross = None
+        try:
+            cross = await db.cross_source_matches.find_one({"matching_articles.guid": guid}, {"agreement_score": 1, "matching_articles": 1})
+        except Exception:
+            cross = None
+
+        # 3.5) External evidence via Google Fact Check API when available
+        external_evidence = []
+        try:
+            external_evidence = await check_google_factcheck(f"{title} {description}")
+        except Exception:
+            external_evidence = []
+
+        # 4) Source credibility (seed table or DB)
+        source_cred = 0.5
+        try:
+            seed = None
+            from app.services.ai_service import SOURCE_CREDIBILITY_SEED
+            name = source
+            if name in SOURCE_CREDIBILITY_SEED:
+                seed = SOURCE_CREDIBILITY_SEED.get(name)
+            if seed is not None:
+                source_cred = float(seed)
+            else:
+                row = await db.source_credibility.find_one({"source_name": source}, {"score": 1})
+                if row and row.get("score") is not None:
+                    source_cred = float(row.get("score"))
+        except Exception:
+            source_cred = 0.5
+
+        # 5) User votes aggregate (optional)
+        user_vote_cred = None
+        try:
+            agg = await db.credibility_votes.aggregate([
+                {"$match": {"source_name": source}},
+                {"$group": {"_id": None, "avg": {"$avg": "$credibility_level"}}}
+            ]).to_list(length=1)
+            if agg and agg[0].get("avg") is not None:
+                user_vote_cred = float(agg[0].get("avg"))
+        except Exception:
+            user_vote_cred = None
+
+        # 6) Compute composite verification confidence
+        vconf = await compute_verification_confidence(
+            article_guid=guid,
+            source_credibility=source_cred,
+            claims=claims,
+            framing=framing,
+            cross_source=cross,
+            external_evidence=external_evidence,
+            user_vote_credibility=user_vote_cred,
+        )
+
+        # 7) Persist verified claims and framing
+        try:
+            if claims:
+                docs = []
+                for c in claims:
+                    docs.append({
+                        "article_id": guid,
+                        "claim_text": c.claim_text,
+                        "verification_status": c.verification_status,
+                        "evidence_sources": c.evidence_sources,
+                        "confidence": float(c.confidence),
+                        "explanation": c.explanation,
+                        "created_at": datetime.utcnow(),
+                    })
+                if docs:
+                    await db.verified_claims.insert_many(docs)
+        except Exception:
+            pass
+
+        try:
+            await db.framing_analyses.update_one({"article_id": guid}, {"$set": framing.model_dump()}, upsert=True)
+        except Exception:
+            pass
+
+        # 8) Audit log
+        try:
+            audit = {
+                "article_id": guid,
+                "timestamp": datetime.utcnow(),
+                "models_used": ["rule-based", "cross-source"],
+                "user_vote_count": 0,
+                "analysis_tier": "system",
+                "final_bias": "unknown",
+                "final_credibility": vconf.overall_score,
+                "consensus_source": "system",
+            }
+            await db.analysis_audit_log.insert_one(audit)
+        except Exception:
+            pass
+
+        # 9) Update cached_articles with summary fields
+        try:
+            await db.cached_articles.update_one(
+                {"guid": guid},
+                {"$set": {
+                    "fact_check_percentage": float(vconf.overall_score) * 100.0,
+                    "fact_check_details": {
+                        "label": vconf.label,
+                        "components": vconf.components,
+                        "explanation": vconf.explanation,
+                        "external_fact_checks": external_evidence[:3],
+                    }
+                }},
+                upsert=False,
+            )
+        except Exception:
+            pass
+
+        # 10) Invalidate aggregated news caches so updated article appears in next API response
+        try:
+            from app.core.cache import cache_delete_pattern
+            await cache_delete_pattern("news:*")
+        except Exception:
+            pass
+
+        return vconf
+    except Exception as e:
+        logger.exception("analyze_and_store_article failed: %s", e)
+        return VerificationConfidence(overall_score=0.5, components={}, label="needs_review", explanation=str(e))

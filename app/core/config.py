@@ -26,6 +26,12 @@ class Settings(BaseSettings):
 
     # External fact-check APIs
     google_factcheck_api_key: str = ""
+    # Redis (optional — used for multi-instance caching)
+    redis_url: str = ""
+
+    # Scheduler settings
+    scheduler_enabled: bool = True
+    scheduler_timezone: str = "Asia/Jerusalem"
 
     class Config:
         env_file = ".env"

@@ -317,6 +317,35 @@ async def fetch_news(
         articles=final_articles,
     )
 
+    # ── Enrich articles with DB-stored fact-check fields if available ────────
+    try:
+        from app.core.database import get_db
+        db = get_db()
+        ids = []
+        guid_map = {}
+        for a in news.articles:
+            gid = getattr(a, "guid", None) or getattr(a, "link", None)
+            if gid:
+                ids.append(gid)
+                guid_map[gid] = a
+
+        if ids:
+            rows = await db.cached_articles.find({"guid": {"$in": ids}}, {"guid": 1, "fact_check_percentage": 1, "fact_check_details": 1}).to_list(length=len(ids))
+            for r in rows:
+                g = r.get("guid")
+                obj = guid_map.get(g)
+                if not obj:
+                    continue
+                try:
+                    if r.get("fact_check_percentage") is not None:
+                        setattr(obj, "fact_check_percentage", float(r.get("fact_check_percentage")))
+                    if r.get("fact_check_details") is not None:
+                        setattr(obj, "fact_check_details", r.get("fact_check_details"))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     # ── Step 7: Optional AI analysis ─────────────────────────────────────────
     if with_analysis and news.articles:
         from app.services.ai_service import analyze_article
@@ -390,6 +419,14 @@ async def _save_articles_to_db(articles: list, category: str) -> None:
 
             d["category"] = category
             d["fetched_at"] = now
+            # Normalize fact-check percentage for storage (0-100)
+            try:
+                if "fact_check_score" in d and "fact_check_percentage" not in d:
+                    score = d.get("fact_check_score")
+                    if isinstance(score, (int, float)):
+                        d["fact_check_percentage"] = float(score) * 100.0
+            except Exception:
+                pass
 
             ops.append(
                 UpdateOne(
@@ -398,6 +435,12 @@ async def _save_articles_to_db(articles: list, category: str) -> None:
                     upsert=True,
                 )
             )
+            # enqueue lightweight fact-check analysis (non-blocking)
+            try:
+                from app.services.fact_check_service import analyze_and_store_article
+                asyncio.create_task(analyze_and_store_article(d))
+            except Exception:
+                pass
 
         if ops:
             result = await db.cached_articles.bulk_write(ops, ordered=False)

@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.core.database import init_db, close_db
+from app.services.scheduler import start_scheduler, stop_scheduler
 from app.routes.news import router as news_router
 from app.routes.ai import router as ai_router
 from app.routes.social_media import router as social_router
@@ -29,7 +30,17 @@ from app.routes.pulse import router as pulse_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    # start periodic scheduler (hourly fetches, nightly full refresh)
+    try:
+        start_scheduler()
+    except Exception:
+        pass
     yield
+    # stop scheduler and close DB
+    try:
+        stop_scheduler()
+    except Exception:
+        pass
     await close_db()
 
 

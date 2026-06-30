@@ -1,13 +1,11 @@
 # app/models/schemas.py
 """Pydantic request/response schemas."""
 
-from typing import Optional
+from typing import Any, Dict, Optional
 from pydantic import BaseModel, EmailStr, field_validator
 
 
 # ── News ──────────────────────────────────────────────────────────────────────
-
-from typing import Dict
 
 
 class CategorySummary(BaseModel):
@@ -64,6 +62,8 @@ class NewsArticle(BaseModel):
     factual_points: Optional[list[str]] = None
     claim_explanation: Optional[str] = None
     bias_explanation: Optional[str] = None
+    fact_check_percentage: Optional[float] = None
+    fact_check_details: Optional[Dict[str, Any]] = None
 
 
 class NewsResponse(BaseModel):
