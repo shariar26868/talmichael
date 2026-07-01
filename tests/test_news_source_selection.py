@@ -2,9 +2,25 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.core.cache import news_key
 from app.models.schemas import NewsArticle
 from app.services.news_service import _select_sources_for_fetch, fetch_news
 from app.utils.feed_config import ISRAELI_SOURCES_FEEDS, INTERNATIONAL_SOURCES_FEEDS
+
+
+def test_news_key_handles_none_language_and_source_type():
+    key = news_key(
+        category="political",
+        limit=10,
+        israeli_only=False,
+        exclude_negative=False,
+        language=None,
+        user_tier=None,
+        with_analysis=False,
+        source_type=None,
+    )
+
+    assert "news:political:10:0:0:english:free:0:israel" == key
 
 
 def test_international_category_prefers_international_sources():

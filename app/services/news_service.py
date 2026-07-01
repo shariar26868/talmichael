@@ -476,8 +476,8 @@ async def fetch_news(
 
     # ── Cache result ──────────────────────────────────────────────────────────
     if use_cache:
-        key = news_key(category, limit, False, exclude_negative, language, user_tier, with_analysis)
-        await cache_set(key, news.model_dump(), NEWS_TTL)
+        key = news_key(category, limit, False, exclude_negative, normalized_language, user_tier, with_analysis)
+        await cache_set(key, news.model_dump(exclude_none=True), NEWS_TTL)
 
     # ── Persist articles to MongoDB (fire-and-forget) ─────────────────────────
     # Save every fetched article to db.cached_articles so they are available
@@ -619,7 +619,10 @@ async def fetch_all_news(limit: int, user_tier: str = "free", with_analysis: boo
             "fetched_at": "",
         },
         "total": len(final_articles),
-        "articles": [a.model_dump() if hasattr(a, "model_dump") else a for a in final_articles],
+        "articles": [
+            a.model_dump(exclude_none=True) if hasattr(a, "model_dump") else a
+            for a in final_articles
+        ],
     }
 
 
@@ -664,7 +667,7 @@ async def fetch_knesset_bills(limit: int = 20) -> dict:
                 "official_api_reachable": False,
                 "official_api_notice": "Official Knesset API unreachable; using mixed RSS fallback",
                 "total": news.total,
-                "articles": [a.model_dump() for a in news.articles],
+                "articles": [a.model_dump(exclude_none=True) for a in news.articles],
             }
         except Exception:
             try:

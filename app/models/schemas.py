@@ -38,6 +38,8 @@ class FeedMeta(BaseModel):
 
 
 class NewsArticle(BaseModel):
+    model_config = {"exclude_none": True}
+
     title: str
     source_type: Optional[str] = None
     link: str
@@ -67,6 +69,8 @@ class NewsArticle(BaseModel):
 
 
 class NewsResponse(BaseModel):
+    model_config = {"exclude_none": True}
+
     meta: FeedMeta
     total: int
     articles: list[NewsArticle]

@@ -56,6 +56,24 @@ def _build_query(base: str, israeli_only: bool) -> str:
     return f"({base}) ({accounts} OR {hashtags}) lang:en"
 
 
+async def _ensure_twscrape_active(api: "TwAPI") -> None:
+    try:
+        stats = await api.pool.stats()
+        if not stats or stats.get("active", 0) == 0:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "twscrape has no active Twitter accounts. "
+                    "Add or activate accounts in TWSCRAPE_DB and restart the app, "
+                    "or use /social/all?include_social=false to get news-only results."
+                ),
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"twscrape account check failed: {exc}")
+
+
 def build_social_query(article: NewsArticle, israeli_only: bool = True) -> str:
     """Build a Twitter/X query from article metadata so social lookup is automatic and contextual."""
     base_terms = []
@@ -102,6 +120,7 @@ async def search_twitter(
     if not _TWSCRAPE_AVAILABLE:
         _unavailable()
     api = _get_tw_api()
+    await _ensure_twscrape_active(api)
     full_query = _build_query(query, israeli_only)
     tweets = []
     try:
@@ -114,11 +133,80 @@ async def search_twitter(
     return {"query": query, "full_query": full_query, "count": len(tweets), "tweets": tweets}
 
 
+async def _search_all_social(limit: int, israeli_only: bool) -> dict:
+    if not _TWSCRAPE_AVAILABLE:
+        _unavailable()
+    api = _get_tw_api()
+    await _ensure_twscrape_active(api)
+    query = "news israel" if israeli_only else "news"
+    full_query = _build_query(query, israeli_only)
+    tweets = []
+    try:
+        async for tweet in api.search(full_query, limit=limit):
+            tweets.append(_to_article(tweet))
+            if len(tweets) >= limit:
+                break
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Twitter search failed: {e}")
+    return {"query": query, "full_query": full_query, "count": len(tweets), "tweets": tweets}
+
+
+@router.get("/twitter/search-all")
+async def search_all_twitter(
+    limit: int = Query(10, ge=1, le=100),
+    israeli_only: bool = Query(True),
+):
+    """Fetch general social-media news tweets without specifying a custom query."""
+    return await _search_all_social(limit, israeli_only)
+
+
+@router.get("/all")
+async def social_and_news(
+    limit: int = Query(10, ge=1, le=100),
+    israeli_only: bool = Query(True),
+    include_news: bool = Query(True, description="Include aggregated news articles from all categories."),
+    include_social: bool = Query(True, description="Include social media posts from Twitter/X via twscrape."),
+):
+    """Fetch combined news articles and social media posts in one response."""
+    if not include_news and not include_social:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one of include_news or include_social must be true.",
+        )
+
+    result = {}
+    if include_social:
+        try:
+            result["social"] = await _search_all_social(limit, israeli_only)
+        except HTTPException as exc:
+            if not include_news:
+                raise
+            result["social"] = []
+            result["social_error"] = exc.detail
+        except Exception as exc:
+            if not include_news:
+                raise HTTPException(status_code=500, detail=str(exc))
+            result["social"] = []
+            result["social_error"] = f"Social fetch failed: {exc}"
+
+    if include_news:
+        from app.services.news_service import fetch_all_news
+
+        result["news"] = await fetch_all_news(
+            limit,
+            user_tier="free",
+            with_analysis=False,
+        )
+
+    return result
+
+
 @router.get("/twitter/user/{username}")
 async def user_tweets(username: str, limit: int = Query(10, ge=1, le=100)):
     if not _TWSCRAPE_AVAILABLE:
         _unavailable()
     api = _get_tw_api()
+    await _ensure_twscrape_active(api)
     tweets = []
     try:
         user = await api.user_by_login(username)
@@ -140,6 +228,7 @@ async def israeli_account_tweets(limit: int = Query(5, ge=1, le=20)):
     if not _TWSCRAPE_AVAILABLE:
         _unavailable()
     api = _get_tw_api()
+    await _ensure_twscrape_active(api)
 
     async def _fetch(username: str):
         try:
