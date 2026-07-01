@@ -470,3 +470,43 @@ async def vote_bill(
             total_votes=total_votes
         )
     )
+
+
+# ── Knesset-prefixed proxy endpoints (same behavior as /bills) ─────────────
+@router.get("/knesset/bills", response_model=BillsListResponse)
+async def knesset_list_bills(
+    days: Optional[int] = Query(None, description="Filter by last updated days, e.g. 30"),
+    user_tier: str = Query("free", description="User tier: free | pro"),
+    with_analysis: bool = Query(False, description="Whether to include AI analysis"),
+):
+    """Proxy to `GET /bills` under the `/knesset` namespace."""
+    return await list_bills(days=days, user_tier=user_tier, with_analysis=with_analysis)
+
+
+@router.get("/knesset/bills/{bill_id}", response_model=BillOut)
+async def knesset_get_bill(
+    bill_id: str,
+    user_tier: str = Query("free", description="User tier: free | pro"),
+    with_analysis: bool = Query(False, description="Whether to include AI analysis"),
+):
+    """Proxy to `GET /bills/{bill_id}` under the `/knesset` namespace."""
+    return await get_bill(bill_id=bill_id, user_tier=user_tier, with_analysis=with_analysis)
+
+
+@router.get("/knesset/bills/{bill_id}/vote", response_model=VoteResponse)
+async def knesset_get_bill_vote(
+    bill_id: str,
+    user_id: str = Query("000000000000000000000000", description="User ID to fetch their personal vote"),
+):
+    """Proxy to `GET /bills/{bill_id}/vote` under the `/knesset` namespace."""
+    return await get_bill_vote(bill_id=bill_id, user_id=user_id)
+
+
+@router.post("/knesset/bills/{bill_id}/vote", response_model=VoteResponse)
+async def knesset_vote_bill(
+    bill_id: str,
+    body: VoteRequest,
+    user_id: str = Query("000000000000000000000000", description="User ID"),
+):
+    """Proxy to `POST /bills/{bill_id}/vote` under the `/knesset` namespace."""
+    return await vote_bill(bill_id=bill_id, body=body, user_id=user_id)

@@ -4,6 +4,7 @@
 from typing import Optional
 from fastapi import APIRouter, Query
 from app.services.news_service import fetch_news, fetch_all_news, fetch_knesset_bills
+from app.routes.bills import list_bills as bills_list, get_bill as bills_get
 from app.models.schemas import NewsResponse
 from app.utils.feed_config import (
     RSS_FEEDS, TOPIC_MIXED_FEEDS, ISRAELI_SOURCES_FEEDS,
@@ -314,6 +315,30 @@ async def knesset(limit: int = Query(20, ge=1, le=50)):
     Primary: Knesset OData API. Fallback: mixed RSS (Knesset + global parliament news).
     """
     return await fetch_knesset_bills(limit)
+
+
+@router.get("/news/bills")
+async def news_bills(
+    days: Optional[int] = Query(None, description="Filter by last updated days, e.g. 30"),
+    user_tier: str = Query("free", description="User tier: free | pro"),
+    with_analysis: bool = Query(False, description="Whether to include AI analysis"),
+):
+    """
+    Proxy endpoint for Knesset bills. Returns the same payload as `GET /bills`.
+    This keeps bills data separate from the /news/* article endpoints while
+    providing a convenient route under the news namespace when required.
+    """
+    return await bills_list(days=days, user_tier=user_tier, with_analysis=with_analysis)
+
+
+@router.get("/news/bills/{bill_id}")
+async def news_get_bill(
+    bill_id: str,
+    user_tier: str = Query("free", description="User tier: free | pro"),
+    with_analysis: bool = Query(False, description="Whether to include AI analysis"),
+):
+    """Proxy to `GET /bills/{bill_id}` returning the bill details."""
+    return await bills_get(bill_id=bill_id, user_tier=user_tier, with_analysis=with_analysis)
 
 
 @router.get("/news/arabic", response_model=NewsResponse)
