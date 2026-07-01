@@ -253,7 +253,14 @@ TOPIC_KEYWORDS: dict[str, dict] = {
             "improve", "growth", "progress", "initiative", "solution",
             "donation", "volunteer", "community", "together",
         ],
-        "excluded": [],
+        "excluded": [
+            "war", "conflict", "attack", "attacks", "rocket", "missile",
+            "bomb", "bombing", "airstrike", "strike", "shelling",
+            "terror", "terrorist", "gaza", "hamas", "hezbollah",
+            "idf", "military", "soldier", "troops", "battle",
+            "killed", "wounded", "casualties", "hostage", "siege",
+            "invasion", "defense", "defence", "weapon",
+        ],
     },
     "international": {
         "required": [

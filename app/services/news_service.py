@@ -413,6 +413,35 @@ async def fetch_news(
     for a in news.articles:
         _apply_fact_check_fallbacks(a)
 
+    # ── Step 6.6: Attach automatic social context to articles ───────────────
+    try:
+        from app.routes.social_media import build_social_query, _get_tw_api, _TWSCRAPE_AVAILABLE
+        if _TWSCRAPE_AVAILABLE and news.articles:
+            async def _attach_social_context(article):
+                try:
+                    if not getattr(article, "link", None):
+                        return
+                    query = build_social_query(article)
+                    api = _get_tw_api()
+                    tweets = []
+                    async for tweet in api.search(query, limit=3):
+                        tweets.append({
+                            "id": str(tweet.id),
+                            "username": tweet.user.username if tweet.user else "unknown",
+                            "text": getattr(tweet, "rawContent", "") or "",
+                            "url": f"https://twitter.com/{tweet.user.username}/status/{tweet.id}" if tweet.user else None,
+                        })
+                        if len(tweets) >= 3:
+                            break
+                    if tweets:
+                        setattr(article, "social_context", tweets)
+                except Exception as exc:
+                    logger.warning("Automatic social context failed for %s: %s", article.link, exc)
+
+            await asyncio.gather(*[_attach_social_context(a) for a in news.articles[:8]])
+    except Exception as exc:
+        logger.warning("Social context enrichment failed: %s", exc)
+
     # ── Step 7: Optional AI analysis ─────────────────────────────────────────
     if with_analysis and news.articles:
         from app.services.ai_service import analyze_article

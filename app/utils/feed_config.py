@@ -278,6 +278,8 @@ TOPIC_MIXED_FEEDS: dict[str, dict[str, str]] = {
     "positive": {
         # ── Israel positive ───────────────────────────────────────────────
         "Google News IL Positive": "https://news.google.com/rss/search?q=Israel+achievement+success+award+innovation+breakthrough&hl=en-IL&gl=IL&ceid=IL:en",
+        "Google News IL Positive Hebrew": "https://news.google.com/rss/search?q=%D7%94%D7%99%D7%A9%D7%92+%D7%94%D7%9C%D7%A6%D7%97%D7%94+%D7%94%D7%A7%D7%93%D7%9E%D7%94+%D7%94%D7%AA%D7%A4%D7%AA%D7%97%D7%95%D7%AA+%D7%AA%D7%A7%D7%95%D7%95%D7%94&hl=he-IL&gl=IL&ceid=IL:he",
+        "Google News IL Positive Innovation": "https://news.google.com/rss/search?q=Israel+innovation+startup+research+breakthrough+award&hl=en-IL&gl=IL&ceid=IL:en",
         # ── Global positive ───────────────────────────────────────────────
         "Google News World Positive": "https://news.google.com/rss/search?q=world+achievement+success+breakthrough+hero+peace+cooperation&hl=en-US&gl=US&ceid=US:en",
         "Google News Global Hope": "https://news.google.com/rss/search?q=global+positive+news+solution+innovation+milestone&hl=en-US&gl=US&ceid=US:en",

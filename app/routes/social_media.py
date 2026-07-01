@@ -4,6 +4,7 @@
 import asyncio
 import os
 import logging
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -53,6 +54,29 @@ def _build_query(base: str, israeli_only: bool) -> str:
     accounts = " OR ".join(f"from:{a}" for a in ISRAELI_TWITTER_ACCOUNTS[:5])
     hashtags = " OR ".join(ISRAELI_HASHTAGS[:3])
     return f"({base}) ({accounts} OR {hashtags}) lang:en"
+
+
+def build_social_query(article: NewsArticle, israeli_only: bool = True) -> str:
+    """Build a Twitter/X query from article metadata so social lookup is automatic and contextual."""
+    base_terms = []
+    if article.title:
+        base_terms.append(article.title)
+    if article.description:
+        base_terms.append(article.description)
+    if article.source:
+        base_terms.append(article.source)
+    if article.source_url:
+        base_terms.append(article.source_url)
+
+    query_text = " ".join(
+        part.strip()
+        for part in base_terms
+        if part and len(part.strip()) < 180
+    )
+    query_text = re.sub(r"\s+", " ", query_text).strip()
+    if not query_text:
+        query_text = "news"
+    return _build_query(query_text, israeli_only=israeli_only)
 
 
 def _to_article(tweet) -> NewsArticle:
