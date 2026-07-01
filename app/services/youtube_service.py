@@ -52,8 +52,7 @@ Rules:
 - Each query should be distinct (different angle / keyword combination)
 - Always include "podcast" OR "interview" OR "episode" in at least 2 of the queries
 - Keep queries short (3–7 words each)
-- Make queries specific enough to avoid music videos, news clips, or short content
-- Return ONLY a JSON array of strings, nothing else
+- Make queries specific enough to avoid music videos, news clips, or short content- If the topic is in Hebrew or the requested language is Hebrew, prefer Hebrew keywords and Israeli context in the queries- Return ONLY a JSON array of strings, nothing else
 
 Topic: {topic}
 
@@ -62,13 +61,22 @@ Example output format:
 """
 
 
-async def generate_search_queries(prompt: str, n: int = 4) -> list[str]:
+async def generate_search_queries(prompt: str, n: int = 4, language: str = "en") -> list[str]:
     """
     Use OpenAI to turn a user prompt into optimized YouTube search queries.
     Falls back to simple query list if OpenAI fails.
     """
     if not settings.openai_api_key:
         # Fallback: generate basic queries without AI
+        if language.lower() in {"he", "iw"}:
+            return [
+                f"{prompt} פודקאסט",
+                f"{prompt} ריאיון",
+                f"{prompt} דיון episode",
+                f"{prompt} שיחה ארוכה",
+                f"{prompt} podcast",
+                f"{prompt} interview",
+            ]
         return [
             f"{prompt} podcast",
             f"{prompt} interview",
@@ -83,7 +91,7 @@ async def generate_search_queries(prompt: str, n: int = 4) -> list[str]:
             messages=[
                 {
                     "role": "user",
-                    "content": _QUERY_PROMPT.format(topic=prompt, n=n),
+                    "content": _QUERY_PROMPT.format(topic=prompt, n=n) + (f"\nRequested language: {language}" if language else ""),
                 }
             ],
             temperature=0.7,
@@ -97,6 +105,10 @@ async def generate_search_queries(prompt: str, n: int = 4) -> list[str]:
             queries = json.loads(match.group())
             if isinstance(queries, list) and all(isinstance(q, str) for q in queries):
                 logger.info("OpenAI generated %d queries for: %s", len(queries), prompt)
+                if language.lower() in {"he", "iw"}:
+                    fallback_queries = [q for q in queries if q.strip()]
+                    if fallback_queries:
+                        return fallback_queries[:n] + [f"{prompt} podcast", f"{prompt} interview"]
                 return [q.strip() for q in queries if q.strip()][:n]
     except Exception as e:
         logger.warning("OpenAI query generation failed: %s — using fallback", e)
@@ -179,12 +191,30 @@ def _score_result(title: str, duration_sec: int) -> int:
     return score
 
 
-async def _scrape_youtube_query(query: str, max_per_query: int = 8) -> list[dict]:
-    """Scrape YouTube search results for a single query."""
-    params = {
+def build_youtube_search_params(query: str, language: str = "en") -> dict:
+    """Build YouTube search parameters with a locale that matches the requested language."""
+    normalized = (language or "en").strip().lower()
+
+    locale_map = {
+        "he": {"hl": "he", "gl": "IL", "lr": "lang_he"},
+        "iw": {"hl": "he", "gl": "IL", "lr": "lang_he"},
+        "ar": {"hl": "ar", "gl": "AE", "lr": "lang_ar"},
+        "en": {"hl": "en", "gl": "US", "lr": "lang_en"},
+    }
+    locale = locale_map.get(normalized, {"hl": "en", "gl": "US", "lr": "lang_en"})
+
+    return {
         "search_query": query,
         "sp": "EgIQAQ",  # Video type filter only
+        "hl": locale["hl"],
+        "gl": locale["gl"],
+        "lr": locale["lr"],
     }
+
+
+async def _scrape_youtube_query(query: str, max_per_query: int = 8, language: str = "en") -> list[dict]:
+    """Scrape YouTube search results for a single query."""
+    params = build_youtube_search_params(query, language=language)
     url = f"{_YT_SEARCH_URL}?{urlencode(params)}"
 
     try:
@@ -253,7 +283,7 @@ async def search_podcasts(
     max_results = max(1, min(max_results, 25))
 
     # Step 1: Generate optimized queries via OpenAI
-    queries = await generate_search_queries(prompt, n=4)
+    queries = await generate_search_queries(prompt, n=4, language=language)
     logger.info("Searching YouTube for '%s' with queries: %s", prompt, queries)
 
     # Step 2: Scrape YouTube for each query in parallel... sequentially for reliability
@@ -261,7 +291,7 @@ async def search_podcasts(
     seen_ids: set[str] = set()
 
     for query in queries:
-        raw = await _scrape_youtube_query(query, max_per_query=8)
+        raw = await _scrape_youtube_query(query, max_per_query=8, language=language)
         for item in raw:
             vid_id = item["video_id"]
             if vid_id not in seen_ids:
