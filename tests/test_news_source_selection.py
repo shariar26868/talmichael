@@ -44,7 +44,24 @@ def test_positive_topic_includes_israeli_positive_query_feeds():
     positive_feeds = TOPIC_MIXED_FEEDS.get("positive", {})
     assert "Google News IL Positive Hebrew" in positive_feeds
     assert "Google News IL Positive Innovation" in positive_feeds
+    assert "NoCamels" in positive_feeds
+    assert "Goodnet" in positive_feeds
+    assert "The Positiv" in positive_feeds
+    assert "Google News IL Weizmann Wonder Wander" in positive_feeds
+    assert "Google News IL Mako Good News" in positive_feeds
+    assert "Google News IL Facebook Positive News" in positive_feeds
     assert "&hl=he-il" in positive_feeds["Google News IL Positive Hebrew"].lower()
+
+
+def test_positive_source_names_are_recognized_as_israeli():
+    from app.utils.filters import is_israeli_source
+
+    assert is_israeli_source("NoCamels", None)
+    assert is_israeli_source("Goodnet", None)
+    assert is_israeli_source("The Positiv", None)
+    assert is_israeli_source("Google News IL Mako Good News", None)
+    assert is_israeli_source(None, "https://nocamels.com/feed/")
+    assert is_israeli_source(None, "https://goodnet.org/feed/")
 
 
 def test_positive_topic_blocks_war_related_imagery_articles():

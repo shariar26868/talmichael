@@ -228,7 +228,9 @@ def _select_sources_for_fetch(
 
     if language.lower() == "arabic":
         priority_groups = [arabic, israeli, topic]
-    elif category in {"international", "positive", "community", "science", "education"}:
+    elif category == "positive":
+        priority_groups = [topic, israeli, international]
+    elif category in {"international", "community", "science", "education"}:
         priority_groups = [international, topic, israeli]
     else:
         priority_groups = [topic, international, israeli]

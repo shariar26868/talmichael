@@ -55,6 +55,10 @@ ISRAELI_SOURCES: set[str] = {
     "Local Call (Sikha Mekomit)",
     "Israel Policy Forum",
     "Google News Israel",
+    "NoCamels", "nocamels.com",
+    "Goodnet", "goodnet.org",
+    "The Positiv", "thepositiv.com",
+    "Weizmann", "weizmann.ac.il",
     # ── .co.il domains (Israeli Hebrew editions) ──────────────────────────
     "haaretz.co.il",
     "israelhayom.co.il",
@@ -296,10 +300,15 @@ TOPIC_MIN_HITS: int = 1
 def is_israeli_source(source_name: Optional[str], source_url: Optional[str]) -> bool:
     # 1. Fast exact set lookup on display name
     if source_name:
+        source_lower = source_name.lower()
         if source_name in ISRAELI_SOURCES:
             return True
         # Case-insensitive fallback (handles 'www.israelhayom.com' Google News tags)
-        if source_name.lower() in {s.lower() for s in ISRAELI_SOURCES}:
+        if source_lower in {s.lower() for s in ISRAELI_SOURCES}:
+            return True
+        # Fuzzy match source fragments inside longer feed names.
+        israeli_lower = {s.lower() for s in ISRAELI_SOURCES if len(s) > 3}
+        if any(name in source_lower for name in israeli_lower):
             return True
 
     # 2. URL-based checks
