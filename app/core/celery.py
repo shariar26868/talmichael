@@ -3,8 +3,8 @@
 from celery import Celery
 from app.core.config import settings
 
-broker = settings.redis_url or "redis://localhost:6379/0"
-backend = settings.redis_url or "redis://localhost:6379/0"
+broker = settings.celery_broker_url or settings.redis_url or "redis://localhost:6379/0"
+backend = settings.celery_result_backend or settings.redis_url or "redis://localhost:6379/0"
 
 celery_app = Celery(
     'nuze',

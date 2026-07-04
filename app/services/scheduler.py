@@ -24,9 +24,8 @@ def _get_scheduler() -> AsyncIOScheduler:
 def start_scheduler():
     """Start the APScheduler and add periodic fetch jobs.
 
-    This schedules an hourly incremental fetch at minute 0 and a nightly
-    full refresh at 00:05 Israel time. The actual work is delegated to
-    `app.services.news_service.fetch_all_news` which persists results.
+    This schedules an hourly incremental fetch at minute 0, a nightly
+    full refresh at 00:05 Israel time, and a daily AI precompute queue.
     """
     if not settings.scheduler_enabled:
         logger.info("Scheduler disabled via settings")
@@ -41,8 +40,11 @@ def start_scheduler():
         # Nightly full refresh at 00:05
         sched.add_job(_nightly_full_refresh_job, CronTrigger(hour=0, minute=5), id="nightly_full_refresh", replace_existing=True)
 
+        # Daily precompute analysis queue at 01:00
+        sched.add_job(_precompute_analysis_job, CronTrigger(hour=1, minute=0), id="precompute_analysis", replace_existing=True)
+
         sched.start()
-        logger.info("Scheduler started with hourly and nightly jobs (tz=%s)", settings.scheduler_timezone)
+        logger.info("Scheduler started with hourly, nightly refresh, and daily AI precompute jobs (tz=%s)", settings.scheduler_timezone)
     except Exception as e:
         logger.exception("Failed to start scheduler: %s", e)
 
@@ -57,12 +59,17 @@ def stop_scheduler():
         _scheduler = None
 
 
-async def _run_fetch_all(limit: int = 80):
+async def _run_fetch_all(limit: int = 80, use_cache: bool = False):
     """Helper to call fetch_all_news in an async-safe way."""
     try:
         from app.services.news_service import fetch_all_news
         # Run and discard result (news_service persists to DB)
-        await fetch_all_news(limit=limit, user_tier="system", with_analysis=False)
+        await fetch_all_news(
+            limit=limit,
+            user_tier="system",
+            with_analysis=False,
+            use_cache=use_cache,
+        )
     except Exception as e:
         logger.exception("Scheduled fetch failed: %s", e)
 
@@ -80,15 +87,41 @@ def _hourly_fetch_job():
         asyncio.run(_run_fetch_all(limit=80))
 
 
+def _precompute_analysis_job():
+    """Run a larger fetch and enqueue article batches for AI analysis."""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = None
+
+    async def _run():
+        from app.services.news_service import fetch_all_news
+        try:
+            result = await fetch_all_news(
+                limit=200,
+                user_tier="system",
+                with_analysis=False,
+                use_cache=False,
+            )
+            articles = result.get("articles", [])
+            _enqueue_precompute_batches(articles)
+            logger.info("Precompute analysis job queued %d articles", len(articles))
+        except Exception as e:
+            logger.exception("Precompute analysis job failed: %s", e)
+
+    if loop and loop.is_running():
+        asyncio.ensure_future(_run())
+    else:
+        asyncio.run(_run())
+
+
 def _enqueue_precompute_batches(articles: list):
     """Helper to enqueue article ID batches into Celery for analysis."""
     try:
-        from app.core.celery import celery_app
         from app.services.ai_tasks import batch_analyze_articles
     except Exception:
         return
 
-    # Build simple IDs (link or generated)
     article_ids = []
     for a in articles:
         link = a.get("link") if isinstance(a, dict) else getattr(a, "link", None)

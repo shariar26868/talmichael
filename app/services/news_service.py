@@ -260,6 +260,7 @@ async def fetch_news(
     language: Optional[str] = None,
     user_tier: str = "free",
     source_type: Optional[Literal["israel", "global"]] = None,  # Kept for compat; ignored
+    force_refresh: bool = False,
 ) -> NewsResponse:
     """
     Fetch mixed Israel + Global news for the given category.
@@ -276,7 +277,7 @@ async def fetch_news(
     normalized_language = normalize_language(language)
 
     # ── Cache key (include category, limit, language, tier, analysis) ─────────
-    if use_cache:
+    if use_cache and not force_refresh:
         key = news_key(category, limit, False, exclude_negative, normalized_language, user_tier, with_analysis)
         cached = await cache_get(key)
         if cached:
@@ -487,7 +488,7 @@ async def fetch_news(
                 article.bias_explanation = analysis.bias_explanation
 
     # ── Cache result ──────────────────────────────────────────────────────────
-    if use_cache:
+    if use_cache or force_refresh:
         key = news_key(category, limit, False, exclude_negative, normalized_language, user_tier, with_analysis)
         await cache_set(key, news.model_dump(exclude_none=True), NEWS_TTL)
 
@@ -562,7 +563,12 @@ async def _save_articles_to_db(articles: list, category: str) -> None:
 
 
 
-async def fetch_all_news(limit: int, user_tier: str = "free", with_analysis: bool = False) -> dict:
+async def fetch_all_news(
+    limit: int,
+    user_tier: str = "free",
+    with_analysis: bool = False,
+    use_cache: bool = True,
+) -> dict:
     """Fetch all categories concurrently, each with mixed Israel + Global content."""
     from app.utils.feed_config import EXCLUDE_NEGATIVE_CATEGORIES
 
@@ -572,6 +578,7 @@ async def fetch_all_news(limit: int, user_tier: str = "free", with_analysis: boo
             exclude_negative=(cat in EXCLUDE_NEGATIVE_CATEGORIES),
             user_tier=user_tier,
             with_analysis=with_analysis,
+            use_cache=use_cache,
         )
         for cat in RSS_FEEDS
     ]
@@ -601,15 +608,17 @@ async def fetch_all_news(limit: int, user_tier: str = "free", with_analysis: boo
     # Ensure source_type on all
     for article in deduped:
         try:
-            if not getattr(article, "source_type", None):
-                article.source_type = (
-                    "israel"
-                    if is_israeli_source(
-                        getattr(article, "source", None),
-                        getattr(article, "source_url", None),
-                    )
-                    else "global"
-                )
+            source = article.get("source") if isinstance(article, dict) else getattr(article, "source", None)
+            source_url = article.get("source_url") if isinstance(article, dict) else getattr(article, "source_url", None)
+            current_source_type = (
+                article.get("source_type") if isinstance(article, dict) else getattr(article, "source_type", None)
+            )
+            if not current_source_type:
+                source_type = "israel" if is_israeli_source(source, source_url) else "global"
+                if isinstance(article, dict):
+                    article["source_type"] = source_type
+                else:
+                    article.source_type = source_type
         except Exception:
             pass
 
