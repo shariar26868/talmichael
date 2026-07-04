@@ -43,6 +43,7 @@ from app.utils.feed_config import (
     ISRAELI_SOURCES_FEEDS, INTERNATIONAL_SOURCES_FEEDS, ARABIC_SOURCES_FEEDS,
     get_all_feeds, get_feeds_by_language, get_source_info,
 )
+from app.utils.licensed_apis import fetch_from_newsapi, fetch_from_newsdata_io, fetch_from_gdelt
 from app.utils.image_enricher import enrich_images
 
 logger = logging.getLogger(__name__)
@@ -304,6 +305,15 @@ async def fetch_news(
         _fetch_single_feed(feed_url, source_name, per_source_limit)
         for source_name, feed_url in selected_sources
     ]
+    # Add licensed API fetches in parallel where available (non-blocking)
+    try:
+        # Use topic_query based on category
+        topic_query = category
+        fetch_tasks.append(fetch_from_newsapi(topic_query, limit=per_source_limit))
+        fetch_tasks.append(fetch_from_newsdata_io(topic_query, limit=per_source_limit))
+        fetch_tasks.append(fetch_from_gdelt(topic_query, limit=per_source_limit))
+    except Exception:
+        pass
     results = await asyncio.gather(*fetch_tasks, return_exceptions=True)
 
     all_articles = []

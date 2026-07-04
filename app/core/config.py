@@ -25,6 +25,17 @@ class Settings(BaseSettings):
     claude_api_key: str = ""
     youtube_api_key: str = ""  # Optional — YouTube Data API v3 key
 
+    # Licensed news API keys
+    newsapi_key: str = ""
+    newsdata_io_key: str = ""
+    worldnews_api_key: str = ""
+    currents_api_key: str = ""
+    mediastack_api_key: str = ""
+
+    # Celery / Broker
+    celery_broker_url: str = ""
+    celery_result_backend: str = ""
+
     # External fact-check APIs
     google_factcheck_api_key: str = ""
     # Redis (optional — used for multi-instance caching)

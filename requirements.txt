@@ -32,4 +32,5 @@ selectolax==0.4.10
 # Scheduler + Redis for caching
 apscheduler==3.10.1
 redis>=4.5.0
+celery>=5.4.0
 

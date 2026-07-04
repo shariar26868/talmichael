@@ -80,6 +80,30 @@ def _hourly_fetch_job():
         asyncio.run(_run_fetch_all(limit=80))
 
 
+def _enqueue_precompute_batches(articles: list):
+    """Helper to enqueue article ID batches into Celery for analysis."""
+    try:
+        from app.core.celery import celery_app
+        from app.services.ai_tasks import batch_analyze_articles
+    except Exception:
+        return
+
+    # Build simple IDs (link or generated)
+    article_ids = []
+    for a in articles:
+        link = a.get("link") if isinstance(a, dict) else getattr(a, "link", None)
+        if link:
+            article_ids.append(link)
+
+    batch_size = 20
+    for i in range(0, len(article_ids), batch_size):
+        batch = article_ids[i:i+batch_size]
+        try:
+            batch_analyze_articles.delay(batch, "system")
+        except Exception:
+            pass
+
+
 def _nightly_full_refresh_job():
     try:
         loop = asyncio.get_event_loop()
