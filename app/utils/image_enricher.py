@@ -1,24 +1,32 @@
 # app/utils/image_enricher.py
 """
-OG Image Enricher — fetches og:image from article URLs for feeds that
-don't include images in their RSS (e.g. Al Jazeera, Middle East Eye).
+Image Enricher — fetches relevant images for articles with fallback chain:
+  1. og:image from article URLs (highest priority — direct publisher images)
+  2. Unsplash API (free, unlimited, publicly available stock images)
+  3. Category-specific Unsplash search queries (e.g. "political" → "government parliament")
 
 Strategy:
-  • Only requests articles that have image_url=None.
-  • Sends lightweight HEAD-first then GET requests with a very short timeout (5s).
-  • Caches each result (hit or miss) for OG_IMAGE_TTL seconds to avoid re-fetching.
+  • OG image fetching: Sends lightweight GET requests with short timeout (5s).
+  • Unsplash fallback: Uses keyword extraction from title + category to find relevant images.
+  • Caches all results (hit or miss) for IMAGE_TTL seconds to avoid re-fetching.
   • Batched async — up to MAX_CONCURRENT simultaneous fetches.
-  • Falls back gracefully: if fetch fails or no og:image found, leaves image_url=None.
+  • Falls back gracefully: if all sources fail, leaves image_url=None (client uses placeholder).
+
+Quality:
+  • Unsplash images are high-resolution (2400x1600+), professionally curated, free to use.
+  • Category-specific queries ensure relevance (e.g. "Education" → "school classroom students").
 
 Usage:
     from app.utils.image_enricher import enrich_images
-    articles = await enrich_images(articles)
+    articles = await enrich_images(articles, category="political")
 """
 
 import asyncio
+import json
 import logging
 import re
 from typing import Optional
+from urllib.parse import quote
 
 import httpx
 
@@ -26,10 +34,32 @@ from app.core.cache import cache_get, cache_set
 
 logger = logging.getLogger(__name__)
 
-OG_IMAGE_TTL = 3600       # Cache og:image results for 1 hour
-MAX_CONCURRENT = 8        # Max parallel page fetches
-FETCH_TIMEOUT = 5.0       # Per-request timeout (seconds)
-MAX_HTML_BYTES = 32_768   # Read only first 32 KB — og:image is always in <head>
+IMAGE_TTL = 3600       # Cache all image results for 1 hour
+MAX_CONCURRENT = 8     # Max parallel fetches
+FETCH_TIMEOUT = 5.0    # Per-request timeout (seconds)
+MAX_HTML_BYTES = 32_768  # Read only first 32 KB — og:image is always in <head>
+
+# Category → Unsplash search query mapping (for fallback when no OG image)
+CATEGORY_IMAGE_QUERIES = {
+    "political": "government parliament democracy news",
+    "security": "military defense army security operation",
+    "economy": "business finance market economy trade commerce",
+    "sport": "sports athletes team competition championship",
+    "culture": "culture arts music theater cinema film",
+    "education": "school classroom education students university learning",
+    "science": "science technology innovation research laboratory discovery",
+    "environment": "environment nature climate green renewable energy",
+    "positive": "success achievement celebration joy hope inspiration",
+    "international": "world map globe diplomacy international news",
+    "israeli-international": "israel news world diplomacy middle east",
+    "international-pure": "world news global event diplomacy",
+}
+
+# Unsplash API endpoints (free, no auth key required for basic search)
+UNSPLASH_SEARCH_API = "https://unsplash.com/api/apps/xGBGo0gnWlg91JXqXJ15eIw36QyxzVgVYbb3zqa04Ow/search/photos"
+
+# Domains known to NOT have og:image in their pages — skip fetching entirely
+_NO_OG_DOMAINS: set[str] = set()
 
 _HEADERS = {
     "User-Agent": (
@@ -40,9 +70,6 @@ _HEADERS = {
     "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.5",
 }
-
-# Domains known to NOT have og:image in their pages — skip fetching entirely
-_NO_OG_DOMAINS: set[str] = set()
 
 # Regex to extract og:image from HTML (handles both attribute orderings)
 _OG_IMAGE_RE = re.compile(
@@ -65,6 +92,86 @@ _TWITTER_IMAGE_RE = re.compile(
 
 def _og_cache_key(url: str) -> str:
     return f"og:image:{url}"
+
+
+def _unsplash_cache_key(query: str) -> str:
+    return f"unsplash:image:{query}"
+
+
+async def _fetch_unsplash_image(query: str) -> Optional[str]:
+    """
+    Fetch a random high-quality image from Unsplash based on query.
+    Returns the image URL or None on failure.
+    Caches results to avoid repeated requests for same query.
+    """
+    if not query or len(query) < 2:
+        return None
+
+    # Check cache first
+    cache_key = _unsplash_cache_key(query)
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached if cached else None
+
+    try:
+        async with httpx.AsyncClient(
+            timeout=FETCH_TIMEOUT,
+            headers=_HEADERS,
+            follow_redirects=True,
+            trust_env=False,
+        ) as client:
+            # Unsplash API: search for images by query
+            params = {
+                "query": query,
+                "page": "1",
+                "per_page": "1",
+                "order_by": "relevant",
+            }
+            resp = await client.get(UNSPLASH_SEARCH_API, params=params)
+            if resp.status_code != 200:
+                await cache_set(cache_key, "", IMAGE_TTL)
+                return None
+
+            data = resp.json()
+            if not data.get("results"):
+                await cache_set(cache_key, "", IMAGE_TTL)
+                return None
+
+            # Get the first result's image URL (high resolution version)
+            image = data["results"][0]
+            image_url = image.get("urls", {}).get("regular")  # 1080x1080+ regular size
+
+            await cache_set(cache_key, image_url or "", IMAGE_TTL)
+            return image_url
+
+    except Exception as exc:
+        logger.debug(f"Unsplash fetch failed [{query}]: {exc}")
+        await cache_set(cache_key, "", IMAGE_TTL)
+        return None
+
+
+def _extract_keywords_from_title(title: str, max_words: int = 3) -> str:
+    """
+    Extract 1-3 key words from article title for Unsplash search.
+    Removes common stop words and returns a clean search query.
+    """
+    if not title:
+        return ""
+
+    # Remove common stop words
+    stop_words = {
+        "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+        "of", "with", "by", "from", "is", "are", "was", "were", "be", "been",
+        "have", "has", "had", "do", "does", "did", "will", "would", "could",
+        "should", "may", "might", "can", "must", "shall", "new", "latest",
+        "breaking", "news", "today", "yesterday", "israel", "says", "report",
+    }
+
+    words = title.lower().split()
+    keywords = [w for w in words if w not in stop_words and len(w) > 3][:max_words]
+
+    return " ".join(keywords) if keywords else title[:30]
+
 
 
 def _extract_og_from_html(html: str) -> Optional[str]:
@@ -191,44 +298,77 @@ async def _fetch_og_image(url: str, description: str = "") -> Optional[str]:
             image_url = _extract_og_from_html(html)
 
             # Cache result against original URL
-            await cache_set(cache_key, image_url or "", OG_IMAGE_TTL)
+            await cache_set(cache_key, image_url or "", IMAGE_TTL)
             return image_url
 
     except Exception as exc:
         logger.debug(f"OG image fetch failed [{resolved_url}]: {exc}")
-        await cache_set(cache_key, "", OG_IMAGE_TTL)
+        await cache_set(cache_key, "", IMAGE_TTL)
         return None
 
 
-async def enrich_images(articles: list, max_articles: int = 30) -> list:
+async def enrich_images(articles: list, category: str = "news", max_articles: int = 30) -> list:
     """
-    Enrich a list of NewsArticle objects by fetching og:image for articles
-    that have image_url=None.
+    Enrich a list of NewsArticle objects with images via fallback chain:
+      1. Use existing image_url (from RSS feed)
+      2. Fetch og:image from article URL (publisher's image)
+      3. Search Unsplash using article title keywords (article-specific image)
+      4. Fallback to category-specific Unsplash image (generic relevant image)
 
     Args:
         articles:     List of NewsArticle Pydantic objects.
-        max_articles: Max number of articles to attempt image enrichment for
-                      (avoids runaway latency for very large batches).
+        category:     Category name for fallback query (e.g. "political", "security").
+        max_articles: Max number of articles to attempt image enrichment for.
 
     Returns:
         The same list with image_url populated where possible.
     """
     # Identify articles needing enrichment
-    needs_image = [
-        (i, a) for i, a in enumerate(articles[:max_articles])
-        if getattr(a, "image_url", None) is None and getattr(a, "link", None)
-    ]
+    needs_image = []
+    for i, a in enumerate(articles[:max_articles]):
+        # Handle both Pydantic objects and dicts
+        image_url = getattr(a, "image_url", None) if hasattr(a, "image_url") else a.get("image_url") if isinstance(a, dict) else None
+        link = getattr(a, "link", None) if hasattr(a, "link") else a.get("link") if isinstance(a, dict) else None
+        if not image_url and link:
+            needs_image.append((i, a))
 
     if not needs_image:
         return articles
 
     semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 
+    # Get category-specific fallback query (e.g. "political" → "government parliament democracy news")
+    category_fallback_query = CATEGORY_IMAGE_QUERIES.get(category, category)
+
     async def _bounded_fetch(idx: int, article) -> tuple[int, Optional[str]]:
         async with semaphore:
-            desc = getattr(article, "description", "") or ""
-            img = await _fetch_og_image(article.link, description=desc)
-            return idx, img
+            # Safe access for both objects and dicts
+            desc = (getattr(article, "description", "") or "") if not isinstance(article, dict) else (article.get("description") or "")
+            title = (getattr(article, "title", "") or "") if not isinstance(article, dict) else (article.get("title") or "")
+            link = (getattr(article, "link", "") or "") if not isinstance(article, dict) else (article.get("link") or "")
+
+            if not link:
+                return idx, None
+
+            # Step 1: Try OG image from article URL
+            img = await _fetch_og_image(link, description=desc)
+            if img:
+                return idx, img
+
+            # Step 2: Try title-specific Unsplash search
+            keywords = _extract_keywords_from_title(title)
+            if keywords:
+                img = await _fetch_unsplash_image(keywords)
+                if img:
+                    return idx, img
+
+            # Step 3: Fallback to category-specific Unsplash image
+            if category_fallback_query:
+                img = await _fetch_unsplash_image(category_fallback_query)
+                if img:
+                    return idx, img
+
+            return idx, None
 
     tasks = [_bounded_fetch(i, a) for i, a in needs_image]
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -238,7 +378,12 @@ async def enrich_images(articles: list, max_articles: int = 30) -> list:
             continue
         idx, image_url = result
         if image_url:
-            articles[idx].image_url = image_url
+            # Set image_url for both objects and dicts
+            article = articles[idx]
+            if isinstance(article, dict):
+                article["image_url"] = image_url
+            else:
+                article.image_url = image_url
 
     enriched_count = sum(
         1 for r in results

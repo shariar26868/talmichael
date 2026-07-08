@@ -147,7 +147,7 @@ def _fallback_stats(articles: list) -> dict:
         "education": ["school", "education", "university", "student", "teacher", "learn"],
         "health": ["health", "hospital", "medical", "doctor", "vaccine", "care"],
         "environment": ["environment", "climate", "green", "nature", "water", "pollution"],
-        "security": ["security", "army", "idf", "defence", "attack", "border"],
+        "security": ["security", "army", "idf", "defense", "attack", "border"],
         "culture": ["culture", "art", "music", "film", "festival", "heritage"],
     }
 

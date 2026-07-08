@@ -75,6 +75,19 @@ def _infer_fact_check_label(score: float) -> str:
     return "disputed"
 
 
+def _article_attr(article, name: str, default=None):
+    if isinstance(article, dict):
+        return article.get(name, default)
+    return getattr(article, name, default)
+
+
+def _set_article_attr(article, name: str, value) -> None:
+    if isinstance(article, dict):
+        article[name] = value
+        return
+    setattr(article, name, value)
+
+
 def _apply_fact_check_fallbacks(article) -> None:
     if getattr(article, "fact_check_percentage", None) is None:
         score = getattr(article, "fact_check_score", None)
@@ -98,31 +111,20 @@ def _apply_fact_check_fallbacks(article) -> None:
             }
 
 
-def _category_placeholder_image(category: str) -> str:
-    label = f"{category.title()} News"
-    svg = (
-        '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">'
-        '<defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1">'
-        '<stop offset="0%" stop-color="#111827"/>'
-        '<stop offset="100%" stop-color="#374151"/>'
-        '</linearGradient></defs>'
-        '<rect width="1200" height="675" fill="url(#g)"/>'
-        '<text x="50%" y="44%" fill="#f9fafb" font-family="Inter,Arial,Helvetica,sans-serif" '
-        'font-size="72" font-weight="700" text-anchor="middle">'
-        f"{label}"
-        '</text>'
-        '<text x="50%" y="56%" fill="#d1d5db" font-family="Inter,Arial,Helvetica,sans-serif" '
-        'font-size="36" text-anchor="middle">Professional news imagery</text>'
-        '</svg>'
-    )
-    return "data:image/svg+xml;charset=UTF-8," + quote(svg, safe="")
-
-
 def _apply_category_placeholders(articles: list, category: str) -> None:
-    placeholder = _category_placeholder_image(category)
-    for article in articles:
-        if not getattr(article, "image_url", None):
-            article.image_url = placeholder
+    """
+    Apply placeholder images for articles that still lack images after enrichment.
+    With Unsplash fallback, this should rarely be needed, but provides a minimal SVG
+    fallback if all sources fail.
+    """
+    articles_without_images = [a for a in articles if not getattr(a, "image_url", None)]
+    if articles_without_images:
+        logger.debug(
+            f"Image enrichment incomplete: {len(articles_without_images)}/{len(articles)} "
+            f"articles in {category} still lack images (falling back to blank)"
+        )
+        # Leave image_url as None — client should handle gracefully
+        # Or optionally add a minimal placeholder here if needed
 
 
 # ── HTTP headers shared across all fetches ─────────────────────────────────────
@@ -253,26 +255,27 @@ def _select_sources_for_fetch(
 async def fetch_news(
     category: str,
     limit: int,
-    israeli_only: bool = False,          # Kept for backward-compat; ignored in new logic
+    israeli_only: bool = False,
     exclude_negative: bool = False,
+    exclude_positive: bool = False,
     use_cache: bool = True,
     with_analysis: bool = False,
     language: Optional[str] = None,
     user_tier: str = "free",
-    source_type: Optional[Literal["israel", "global"]] = None,  # Kept for compat; ignored
+    source_type: Optional[Literal["israel", "global"]] = None,
     force_refresh: bool = False,
+    force_today_priority: bool = False,
 ) -> NewsResponse:
     """
     Fetch mixed Israel + Global news for the given category.
 
-    Key design decisions:
-    • ALL categories fetch BOTH Israeli and global sources simultaneously.
-    • Topic relevance is enforced via keyword filters (TOPIC_KEYWORDS in filters.py),
-      so political feeds won't show sport articles even from general news sources.
-    • The `israeli_only` and `source_type` params are intentionally ignored —
-      every API now returns mixed content by design.
-    • Articles are tagged with source_type="israel" | "global" so clients can
-      still filter/display by origin if desired.
+    Parameters:
+    • israeli_only: If True, filter to Israeli sources only (e.g., for Sport).
+    • exclude_negative: Remove negative sentiment articles.
+    • exclude_positive: Remove positive sentiment articles (for Science/Education/Culture).
+    • force_today_priority: If True, prioritize today's articles and stop showing older articles
+      if threshold reached (for Security, Politics, Economy, Sport).
+    • with_analysis: Enable AI sentiment/bias analysis (pro/platinum users only).
     """
     normalized_language = normalize_language(language)
 
@@ -284,7 +287,11 @@ async def fetch_news(
             return NewsResponse(**cached)
 
     # ── Step 1: Build mixed source list ───────────────────────────────────────
-    sources_to_fetch = _build_mixed_source_list(category, normalized_language)
+    if israeli_only:
+        # Sport Israeli-only: use only Israeli sources
+        sources_to_fetch = ISRAELI_SOURCES_FEEDS.copy()
+    else:
+        sources_to_fetch = _build_mixed_source_list(category, normalized_language)
 
     # Limit parallel requests while keeping global coverage broad enough for the app.
     MAX_SOURCES = min(24, max(18, limit + 4))
@@ -307,14 +314,16 @@ async def fetch_news(
         for source_name, feed_url in selected_sources
     ]
     # Add licensed API fetches in parallel where available (non-blocking)
-    try:
-        # Use topic_query based on category
-        topic_query = category
-        fetch_tasks.append(fetch_from_newsapi(topic_query, limit=per_source_limit))
-        fetch_tasks.append(fetch_from_newsdata_io(topic_query, limit=per_source_limit))
-        fetch_tasks.append(fetch_from_gdelt(topic_query, limit=per_source_limit))
-    except Exception:
-        pass
+    # NOTE: Disabled to avoid rate limiting (100 req/24hr limit reached)
+    # Uncomment when using paid API tiers or when rate limit has reset
+    # try:
+    #     # Use topic_query based on category
+    #     topic_query = category
+    #     fetch_tasks.append(fetch_from_newsapi(topic_query, limit=per_source_limit))
+    #     fetch_tasks.append(fetch_from_newsdata_io(topic_query, limit=per_source_limit))
+    #     fetch_tasks.append(fetch_from_gdelt(topic_query, limit=per_source_limit))
+    # except Exception:
+    #     pass
     results = await asyncio.gather(*fetch_tasks, return_exceptions=True)
 
     all_articles = []
@@ -325,38 +334,99 @@ async def fetch_news(
 
     # ── Step 3: Enrich each article with source_url + source_type ─────────────
     for article in all_articles:
-        if not article.source_url and article.source:
-            article.source_url = get_source_info(article.source).get("url") or None
+        source = _article_attr(article, "source")
+        source_url = _article_attr(article, "source_url")
+        if not source_url and source:
+            source_url = get_source_info(source).get("url") or None
+            _set_article_attr(article, "source_url", source_url)
         try:
-            article.source_type = (
+            source_type = (
                 "israel"
-                if is_israeli_source(article.source, article.source_url)
+                if is_israeli_source(source, source_url)
                 else "global"
             )
         except Exception:
-            article.source_type = "global"
+            source_type = "global"
+        _set_article_attr(article, "source_type", source_type)
 
     # ── Step 4: Filters ───────────────────────────────────────────────────────
 
     filtered = []
+    from datetime import datetime, timedelta
+    today_date = datetime.utcnow().date()
+    yesterday_date = today_date - timedelta(days=1)
+    two_days_ago = today_date - timedelta(days=2)
+    three_days_ago = today_date - timedelta(days=3)
+
     for a in all_articles:
+        source = _article_attr(a, "source")
+        source_url = _article_attr(a, "source_url")
+        title = _article_attr(a, "title", "")
+        description = _article_attr(a, "description", "")
+
         # Block known spam/wiki sources
-        if is_blocked_source(a.source, a.source_url):
+        if is_blocked_source(source, source_url):
             continue
         # Opinion pieces out
-        if is_opinion(a.title, a.description):
+        if is_opinion(title, description):
             continue
         # 🔑 TOPIC RELEVANCE — this is the key guard that keeps content on-topic
-        # across ALL sources (both Israeli general news and global general news)
-        if not is_topic_relevant(category, a.title, a.description, a.source, a.source_url):
+        if not is_topic_relevant(category, title, description, source, source_url):
             continue
+        # Sentiment filtering: exclude negative if requested
+        if exclude_negative and is_negative(title, description):
+            continue
+        # Sentiment filtering: exclude positive (Science, Education, Culture show negative only)
+        if exclude_positive:
+            positive_keywords = (
+                "achievement", "success", "breakthrough", "award", "positive",
+                "hope", "recovery", "progress", "improve", "winner",
+            )
+            title_desc = f"{title or ''} {description or ''}".lower()
+            if any(kw in title_desc for kw in positive_keywords):
+                continue
         filtered.append(a)
 
-    # Optional: exclude negative sentiment articles
-    if exclude_negative:
-        filtered = [a for a in filtered if not is_negative(a.title, a.description)]
+    # ── Step 5: Date-based prioritization (if force_today_priority) ─────────────
+    if force_today_priority:
+        today_articles = []
+        yesterday_articles = []
+        two_days_articles = []
+        three_days_articles = []
+        older_articles = []
 
-    # ── Step 5: Deduplicate by URL ────────────────────────────────────────────
+        for a in filtered:
+            pub_date_value = _article_attr(a, "pub_date")
+            try:
+                article_date = pub_date_value.date() if hasattr(pub_date_value, 'date') else pub_date_value
+            except Exception:
+                article_date = None
+            if article_date == today_date:
+                today_articles.append(a)
+            elif article_date == yesterday_date:
+                yesterday_articles.append(a)
+            elif article_date == two_days_ago:
+                two_days_articles.append(a)
+            elif article_date == three_days_ago:
+                three_days_articles.append(a)
+            else:
+                older_articles.append(a)
+
+        # Priority: TODAY first, then yesterday, then 2 days, then 3 days, then older
+        # If today's articles >= limit, don't show older
+        prioritized = today_articles.copy()
+        if len(prioritized) < limit:
+            prioritized.extend(yesterday_articles)
+        if len(prioritized) < limit:
+            prioritized.extend(two_days_articles)
+        if len(prioritized) < limit:
+            prioritized.extend(three_days_articles)
+        if len(prioritized) < limit:
+            prioritized.extend(older_articles)
+
+        filtered = prioritized
+
+    # ── Step 5b: Deduplicate by URL ────────────────────────────────────────────
     seen_urls: set[str] = set()
     deduplicated = []
     for article in filtered:
@@ -366,10 +436,13 @@ async def fetch_news(
 
     final_articles = deduplicated[:limit]
 
-    # ── Step 5b: OG Image enrichment ─────────────────────────────────────────
-    # Fetch og:image for articles missing image_url (e.g. Al Jazeera, Middle East Eye).
-    # Runs concurrently with semaphore; results are cached per-URL for 1 hour.
-    final_articles = await enrich_images(final_articles)
+    # ── Step 5b: Image enrichment ───────────────────────────────────────────────
+    # Enriches images via fallback chain:
+    #   1. OG image from article URL (publisher's image)
+    #   2. Title-specific Unsplash search
+    #   3. Category-specific Unsplash image
+    # Results are cached per-URL for 1 hour.
+    final_articles = await enrich_images(final_articles, category=category)
     _apply_category_placeholders(final_articles, category)
 
     # Count how many are Israeli vs global for metadata

@@ -43,7 +43,7 @@ _MIN_ARTICLES_THRESHOLD = 5
 
 # Categories to summarise (same keys as RSS_FEEDS, minus knesset which is bills)
 _SUMMARY_CATEGORIES = [
-    "international", "political", "economy", "defence",
+    "international", "political", "economy", "security",
     "sport", "culture", "science", "environment",
     "education", "community",
 ]

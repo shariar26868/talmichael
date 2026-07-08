@@ -157,9 +157,7 @@ INTERNATIONAL_SOURCES_FEEDS: dict[str, str] = {
     "Foreign Affairs": "https://www.foreignaffairs.com/rss.xml",
     "Time": "https://news.google.com/rss/search?q=site:time.com&hl=en-US&gl=US&ceid=US:en",
     "Newsweek": "https://news.google.com/rss/search?q=site:newsweek.com&hl=en-US&gl=US&ceid=US:en",
-    "USA Today": "https://rssfeeds.usatoday.com/usatodaycomworld-topstories&x=1",
     "The Hill": "https://news.google.com/rss/search?q=site:thehill.com&hl=en-US&gl=US&ceid=US:en",
-    "Vox": "https://www.vox.com/rss/index.xml",
     "The New Yorker": "https://www.newyorker.com/feed/news",
     "Fox News": "https://feeds.foxnews.com/foxnews/latest",
     "NBC News": "https://feeds.nbcnews.com/nbcnews/public/news",
@@ -258,15 +256,16 @@ ARABIC_SOURCES_FEEDS: dict[str, str] = {
 RSS_FEEDS: dict[str, str] = {
     "political": "https://news.google.com/rss/search?q=Israel+politics+Knesset+government&hl=en-IL&gl=IL&ceid=IL:en",
     "economy": "https://news.google.com/rss/search?q=Israel+economy+finance+market+business&hl=en-IL&gl=IL&ceid=IL:en",
-    "defence": "https://news.google.com/rss/search?q=Israel+security+defense+military+IDF&hl=en-IL&gl=IL&ceid=IL:en",
+    "security": "https://news.google.com/rss/search?q=Israel+security+defense+military+IDF&hl=en-IL&gl=IL&ceid=IL:en",
     "education": "https://news.google.com/rss/search?q=Israel+education+schools+university+students&hl=en-IL&gl=IL&ceid=IL:en",
-    "community": "https://news.google.com/rss/search?q=Israel+society+community+social&hl=en-IL&gl=IL&ceid=IL:en",
     "sport": "https://news.google.com/rss/search?q=Israel+sport+football+basketball&hl=en-IL&gl=IL&ceid=IL:en",
     "culture": "https://news.google.com/rss/search?q=Israel+culture+arts+music&hl=en-IL&gl=IL&ceid=IL:en",
     "environment": "https://news.google.com/rss/search?q=Israel+environment+climate+energy&hl=en-IL&gl=IL&ceid=IL:en",
     "science": "https://news.google.com/rss/search?q=Israel+science+technology+innovation&hl=en-IL&gl=IL&ceid=IL:en",
     "positive": "https://news.google.com/rss/search?q=Israel+positive+achievement+breakthrough&hl=en-IL&gl=IL&ceid=IL:en",
     "international": "https://news.google.com/rss/search?q=Israel+international&hl=en-IL&gl=IL&ceid=IL:en",
+    "israeli-international": "https://news.google.com/rss/search?q=Israel+world+opinion+international&hl=en-US&gl=US&ceid=US:en",
+    "international-pure": "https://news.google.com/rss/search?q=world+politics+government+-Israel&hl=en-US&gl=US&ceid=US:en",
     "knesset": "https://news.google.com/rss/search?q=Knesset+legislation+bill+Israel+law&hl=en-IL&gl=IL&ceid=IL:en",
 }
 
@@ -292,15 +291,14 @@ TOPIC_MIXED_FEEDS: dict[str, dict[str, str]] = {
         "Google News IL Economy": "https://news.google.com/rss/search?q=Israel+economy+GDP+shekel+finance+business&hl=en-IL&gl=IL&ceid=IL:en",
         "Google News IL Business": "https://news.google.com/rss/search?q=ישראל+כלכלה+עסקים+שוק&hl=he-IL&gl=IL&ceid=IL:he",
         # ── Global economy ────────────────────────────────────────────────
-        "Google News World Business": "https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx6TVdZU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US:en",
         "Google News Global Markets": "https://news.google.com/rss/search?q=global+economy+stock+market+trade+inflation&hl=en-US&gl=US&ceid=US:en",
         "Google News Finance": "https://news.google.com/rss/search?q=world+finance+investment+GDP+recession&hl=en-US&gl=US&ceid=US:en",
     },
-    "defence": {
-        # ── Israel defence ────────────────────────────────────────────────
+    "security": {
+        # ── Israel security ───────────────────────────────────────────────
         "Google News IL Defence": "https://news.google.com/rss/search?q=Israel+IDF+military+security+Gaza+Hamas&hl=en-IL&gl=IL&ceid=IL:en",
         "Google News IL Security": "https://news.google.com/rss/search?q=ישראל+צבא+ביטחון+IDF&hl=he-IL&gl=IL&ceid=IL:he",
-        # ── Global defence ────────────────────────────────────────────────
+        # ── Global security ───────────────────────────────────────────────
         "Google News World Defence": "https://news.google.com/rss/search?q=world+military+defense+war+conflict+NATO&hl=en-US&gl=US&ceid=US:en",
         "Google News Middle East Security": "https://news.google.com/rss/search?q=Middle+East+military+conflict+security+Iran&hl=en-US&gl=US&ceid=US:en",
         "Google News Global Military": "https://news.google.com/rss/search?q=global+army+weapons+armed+forces+warfare&hl=en-US&gl=US&ceid=US:en",
@@ -326,7 +324,6 @@ TOPIC_MIXED_FEEDS: dict[str, dict[str, str]] = {
         "Google News IL Sport": "https://news.google.com/rss/search?q=Israel+sport+football+basketball+Maccabi&hl=en-IL&gl=IL&ceid=IL:en",
         "Google News IL Hebrew Sport": "https://news.google.com/rss/search?q=ספורט+ישראל+כדורגל+כדורסל+מכבי&hl=he-IL&gl=IL&ceid=IL:he",
         # ── Global sport ──────────────────────────────────────────────────
-        "Google News World Sport": "https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRFp1ZGpZU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US:en",
         "Google News Global Football": "https://news.google.com/rss/search?q=world+football+soccer+FIFA+Premier+League+Champions+League&hl=en-US&gl=US&ceid=US:en",
         "Google News Global Basketball": "https://news.google.com/rss/search?q=NBA+basketball+EuroLeague+sport+championship&hl=en-US&gl=US&ceid=US:en",
         "Google News Olympics": "https://news.google.com/rss/search?q=Olympics+athletics+world+championship+sport&hl=en-US&gl=US&ceid=US:en",
@@ -336,7 +333,6 @@ TOPIC_MIXED_FEEDS: dict[str, dict[str, str]] = {
         "Google News IL Culture": "https://news.google.com/rss/search?q=Israel+culture+art+music+film+theater&hl=en-IL&gl=IL&ceid=IL:en",
         "Google News IL Hebrew Culture": "https://news.google.com/rss/search?q=ישראל+תרבות+אמנות+מוזיקה+קולנוע&hl=he-IL&gl=IL&ceid=IL:he",
         # ── Global culture ────────────────────────────────────────────────
-        "Google News World Entertainment": "https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRFp0WldZU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US:en",
         "Google News Global Culture": "https://news.google.com/rss/search?q=world+culture+art+music+film+festival+exhibition&hl=en-US&gl=US&ceid=US:en",
     },
     "environment": {

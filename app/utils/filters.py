@@ -121,6 +121,21 @@ OPINION_KEYWORDS: tuple[str, ...] = (
 #        AND NONE of the excluded keywords dominate the content.
 
 TOPIC_KEYWORDS: dict[str, dict] = {
+    "security": {
+        "required": [
+            "security", "defence", "defense", "military", "army", "navy", "air force",
+            "idf", "soldier", "weapon", "missile", "drone",
+            "war", "conflict", "combat", "operation", "strike", "attack",
+            "hamas", "hezbollah", "iran", "nuclear", "intelligence",
+            "mossad", "shin bet", "nato", "pentagon", "arms", "airstrike",
+            "battalion", "troops", "hostage", "ceasefire", "terror",
+            "terrorist", "warfare", "artillery",
+        ],
+        "excluded": [
+            "sport", "football", "soccer", "basketball", "goal",
+            "entertainment", "film", "music",
+        ],
+    },
     "political": {
         "required": [
             "politic", "government", "parliament", "knesset", "election",
@@ -150,21 +165,7 @@ TOPIC_KEYWORDS: dict[str, dict] = {
             "match", "championship", "tournament",
         ],
     },
-    "defence": {
-        "required": [
-            "defense", "defence", "military", "army", "navy", "air force",
-            "idf", "soldier", "weapon", "missile", "drone", "security",
-            "war", "conflict", "combat", "operation", "strike", "attack",
-            "hamas", "hezbollah", "iran", "nuclear", "intelligence",
-            "mossad", "shin bet", "nato", "pentagon", "arms", "airstrike",
-            "battalion", "troops", "hostage", "ceasefire", "terror",
-            "terrorist", "warfare", "artillery",
-        ],
-        "excluded": [
-            "sport", "football", "soccer", "basketball", "goal",
-            "entertainment", "film", "music",
-        ],
-    },
+
     "education": {
         "required": [
             "education", "school", "university", "college", "student",
@@ -178,20 +179,7 @@ TOPIC_KEYWORDS: dict[str, dict] = {
             "combat", "weapon",
         ],
     },
-    "community": {
-        "required": [
-            "community", "society", "social", "people", "citizen",
-            "neighborhood", "local", "welfare", "charity", "nonprofit",
-            "volunteer", "immigration", "refugee", "diaspora", "religion",
-            "jewish", "muslim", "christian", "culture", "tradition",
-            "family", "health", "hospital", "mental health", "housing",
-            "poverty", "inequality", "human rights", "protest", "rally",
-        ],
-        "excluded": [
-            "sport", "football", "soccer", "basketball", "finance",
-            "stock", "market",
-        ],
-    },
+
     "sport": {
         "required": [
             "sport", "sports", "football", "soccer", "basketball", "tennis",
@@ -243,6 +231,7 @@ TOPIC_KEYWORDS: dict[str, dict] = {
             "robot", "startup", "software", "hardware", "data", "digital",
             "internet", "5g", "semiconductor", "chip",
         ],
+        "sentiment_filter": "negative_only",
         "excluded": [
             "sport", "football", "soccer", "political scandal",
             "entertainment gossip",
@@ -256,6 +245,8 @@ TOPIC_KEYWORDS: dict[str, dict] = {
             "celebration", "winner", "champion", "inspire", "help",
             "improve", "growth", "progress", "initiative", "solution",
             "donation", "volunteer", "community", "together",
+            "restaurant", "food", "travel", "tourism", "recommendation",
+            "cuisine", "dining", "adventure", "destination", "experience",
         ],
         "excluded": [
             "war", "conflict", "attack", "attacks", "rocket", "missile",

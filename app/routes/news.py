@@ -109,11 +109,12 @@ async def international(
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     """
-    International news: global diplomatic, geopolitical, and UN affairs.
-    Returns MIXED articles — Israel's international stance + global world affairs.
+    International news: global affairs EXCLUDING Israel-related news.
+    Returns pure international articles — world events, diplomacy, geopolitics WITHOUT Israel involved.
+    For international perspective ON Israel, use /news/israeli-international instead.
     """
     return await fetch_news(
-        "international", limit,
+        "international-pure", limit,
         exclude_negative=True,
         language="hebrew",
         user_tier=user_tier,
@@ -121,7 +122,24 @@ async def international(
     )
 
 
-@router.get("/news/economy", response_model=NewsResponse)
+@router.get("/news/israeli-international", response_model=NewsResponse)
+async def israeli_international(
+    limit: int = Query(20, ge=1, le=100),
+    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
+):
+    """
+    Israeli-International news: what the world says ABOUT Israel ONLY.
+    Returns international sources coverage of Israel — global media perspective on Israeli news.
+    For pure international news without Israel, use /news/international instead.
+    """
+    return await fetch_news(
+        "israeli-international", limit,
+        exclude_negative=True,
+        language="hebrew",
+        user_tier=user_tier,
+        with_analysis=with_analysis,
+    )@router.get("/news/economy", response_model=NewsResponse)
 async def economy(
     limit: int = Query(20, ge=1, le=100),
     user_tier: str = Query("free", description="User tier: free|pro|platinum"),
@@ -130,12 +148,34 @@ async def economy(
     """
     Economy & finance news.
     Returns MIXED articles — Israel economy + global markets, trade, finance.
+    Always shows today's articles first (no older articles if today's threshold reached).
     """
     return await fetch_news(
         "economy", limit,
         language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
+        force_today_priority=True,
+    )
+
+
+@router.get("/news/security", response_model=NewsResponse)
+async def security(
+    limit: int = Query(20, ge=1, le=100),
+    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
+):
+    """
+    Security & defence news.
+    Returns MIXED articles — IDF/Israel security + global military conflicts.
+    Always shows today's articles first (no older articles if today's threshold reached).
+    """
+    return await fetch_news(
+        "security", limit,
+        language="hebrew",
+        user_tier=user_tier,
+        with_analysis=with_analysis,
+        force_today_priority=True,
     )
 
 
@@ -146,14 +186,14 @@ async def defence(
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     """
-    Defence & security news.
-    Returns MIXED articles — IDF/Israel security + global military conflicts.
+    Deprecated: use /news/security instead.
     """
     return await fetch_news(
-        "defence", limit,
+        "security", limit,
         language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
+        force_today_priority=True,
     )
 
 
@@ -164,7 +204,7 @@ async def education(
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     """
-    Education news.
+    Education news — negative only (positive on /news/positive).
     Returns MIXED articles — Israeli schools/universities + global education trends.
     """
     return await fetch_news(
@@ -172,6 +212,7 @@ async def education(
         language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
+        exclude_positive=True,
     )
 
 
@@ -206,6 +247,7 @@ async def political(
     Political news.
     Returns MIXED articles — Israeli politics (Knesset, Netanyahu) + global politics.
     Sport/entertainment articles are filtered out by topic keywords.
+    Always shows today's articles first (no older articles if today's threshold reached).
     """
     return await fetch_news(
         "political", limit,
@@ -213,6 +255,7 @@ async def political(
         language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
+        force_today_priority=True,
     )
 
 
@@ -223,8 +266,8 @@ async def positive(
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     """
-    Positive & uplifting news.
-    Returns MIXED articles — Israeli achievements + global breakthroughs and good news.
+    Positive & uplifting news — including social recommendations (restaurants, food, travel).
+    Returns MIXED articles — Israeli achievements + global breakthroughs, good news, social recommendations.
     """
     return await fetch_news(
         "positive", limit,
@@ -242,15 +285,17 @@ async def sport(
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     """
-    Sports news.
-    Returns MIXED articles — Israeli sport (Maccabi, Hapoel) + global sport (FIFA, NBA, Olympics).
-    Political/economy articles are filtered out by topic keywords.
+    Sports news — Israeli sports ONLY.
+    Returns articles for Israeli teams (Maccabi, Hapoel) only, not global sport.
+    Always shows today's articles first (no older articles if today's threshold reached).
     """
     return await fetch_news(
         "sport", limit,
         language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
+        israeli_only=True,
+        force_today_priority=True,
     )
 
 
@@ -261,7 +306,7 @@ async def culture(
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     """
-    Culture & entertainment news.
+    Culture & entertainment news — negative only (positive on /news/positive).
     Returns MIXED articles — Israeli culture (arts, film, music) + global entertainment.
     """
     return await fetch_news(
@@ -269,6 +314,7 @@ async def culture(
         language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
+        exclude_positive=True,
     )
 
 
@@ -297,7 +343,7 @@ async def science(
     with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
 ):
     """
-    Science & technology news.
+    Science & technology news — negative only (positive on /news/positive).
     Returns MIXED articles — Israeli tech startups/AI + global science breakthroughs.
     """
     return await fetch_news(
@@ -305,6 +351,7 @@ async def science(
         language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
+        exclude_positive=True,
     )
 
 

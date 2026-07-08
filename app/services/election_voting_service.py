@@ -6,11 +6,13 @@ Also provides election news feed and timeline.
 """
 
 import logging
+import re
 from datetime import datetime
 from typing import Optional
 
 from app.core.database import get_db
 from app.services.election_service import ELECTION_2026_PARTIES, ELECTION_2026_OVERVIEW
+from app.services.news_service import fetch_news
 
 logger = logging.getLogger(__name__)
 
@@ -225,44 +227,94 @@ async def get_election_timeline() -> dict:
 
 async def get_election_news(category: Optional[str] = None, limit: int = 20) -> dict:
     """
-    Return news articles specifically about the 2026 election.
-    Fetches from stored articles matching election keywords.
+    Return real election-related news articles.
+    Prefers live news feeds and falls back to cached articles if no live results are available.
     """
     db = get_db()
 
-    # Election-relevant keywords in English and Hebrew
     election_keywords = [
         "election", "vote", "poll", "ballot", "campaign", "candidate",
-        "Knesset 2026", "בחירות", "בחירות 2026", "סקר", "מפלגה",
+        "Knesset 2026", "coalition", "opposition", "legislation",
+        "בחירות", "בחירות 2026", "סקר", "מפלגה", "כנסת",
         "Bennett", "Netanyahu", "Lapid", "Gantz", "Lieberman",
-        "Eisenkot", "Smotrich", "Ben-Gvir",
+        "Eisenkot", "Smotrich", "Ben-Gvir", "Saar", "Deri",
     ]
+    keyword_regex = "|".join(re.escape(k) for k in election_keywords)
 
-    keyword_regex = "|".join(election_keywords)
-    query = {
-        "$or": [
-            {"title": {"$regex": keyword_regex, "$options": "i"}},
-            {"description": {"$regex": keyword_regex, "$options": "i"}},
-        ]
-    }
-    if category:
-        query["category"] = category
+    def _to_payload(article) -> dict:
+        if hasattr(article, "model_dump"):
+            payload = article.model_dump(exclude_none=True)
+        elif isinstance(article, dict):
+            payload = dict(article)
+        else:
+            payload = {}
+        title = payload.get("title") or ""
+        description = payload.get("description") or ""
+        if not re.search(keyword_regex, f"{title} {description}", flags=re.IGNORECASE):
+            return {}
+        payload.setdefault("id", payload.get("guid") or payload.get("link") or payload.get("title"))
+        payload.setdefault("source", payload.get("source") or "unknown")
+        return payload
 
-    articles = await db.articles.find(
-        query,
-        {"_id": 1, "title": 1, "description": 1, "source": 1, "pub_date": 1,
-         "link": 1, "image_url": 1, "sentiment": 1, "bias": 1}
-    ).sort("pub_date", -1).limit(limit).to_list(limit)
+    articles: list[dict] = []
+    try:
+        live_news = await fetch_news("politics", max(limit * 2, 12), language="english")
+        for article in getattr(live_news, "articles", []) or []:
+            payload = _to_payload(article)
+            if payload:
+                articles.append(payload)
+    except Exception as exc:
+        logger.warning("Election news live fetch failed: %s", exc)
 
-    for a in articles:
-        a["id"] = str(a.pop("_id"))
+    if not articles:
+        try:
+            live_news = await fetch_news("knesset", max(limit * 2, 12), language="english")
+            for article in getattr(live_news, "articles", []) or []:
+                payload = _to_payload(article)
+                if payload:
+                    articles.append(payload)
+        except Exception as exc:
+            logger.warning("Election news knesset feed fallback failed: %s", exc)
+
+    if not articles:
+        query = {
+            "$or": [
+                {"title": {"$regex": keyword_regex, "$options": "i"}},
+                {"description": {"$regex": keyword_regex, "$options": "i"}},
+            ]
+        }
+        if category:
+            query["category"] = category
+        cached_articles = await db.cached_articles.find(
+            query,
+            {
+                "_id": 1, "guid": 1, "title": 1, "description": 1,
+                "source": 1, "source_type": 1, "link": 1, "image_url": 1,
+                "pub_date": 1, "first_seen": 1, "sentiment": 1, "bias": 1, "category": 1,
+            }
+        ).sort("pub_date", -1).limit(limit).to_list(limit)
+        for article in cached_articles:
+            article["id"] = str(article.pop("_id"))
+            articles.append(article)
+
+    seen_urls = set()
+    deduped: list[dict] = []
+    for article in articles:
+        link = article.get("link") or article.get("guid") or article.get("url")
+        if not link or link in seen_urls:
+            continue
+        seen_urls.add(link)
+        deduped.append(article)
+
+    deduped = deduped[:limit]
 
     return {
-        "total": len(articles),
+        "total": len(deduped),
         "election_year": 2026,
         "category_filter": category,
-        "articles": articles,
-        "note": "Articles filtered by election-related keywords.",
+        "articles": deduped,
+        "note": "Election articles are now sourced from live news feeds first, with cached articles as fallback.",
+        "source": "live_news_feeds",
     }
 
 
@@ -320,28 +372,71 @@ async def get_election_participants() -> dict:
     Return a unified list of parties and candidates for the 2026 election.
     Each item has a distinct id and a type field: party or candidate.
     """
-    # Build party entries
-    parties = [
-        {
-            "id": f"party_{i + 1}",
+    db = get_db()
+
+    known_parties = {}
+    for party in ELECTION_2026_PARTIES:
+        name = party.get("name")
+        if name:
+            known_parties[name] = party
+
+    party_docs = await db.parties.find(
+        {},
+        {"_id": 0, "name": 1, "name_hebrew": 1, "leader": 1, "website": 1, "official_website": 1, "wikipedia_url": 1, "wing": 1, "bloc": 1}
+    ).to_list(200)
+    for party_doc in party_docs:
+        name = party_doc.get("name")
+        if name and name not in known_parties:
+            known_parties[name] = {
+                "name": name,
+                "name_hebrew": party_doc.get("name_hebrew"),
+                "leader": party_doc.get("leader"),
+                "website": party_doc.get("website"),
+                "official_website": party_doc.get("official_website"),
+                "wikipedia_url": party_doc.get("wikipedia_url"),
+                "wing": party_doc.get("wing"),
+                "bloc": party_doc.get("bloc"),
+            }
+
+    all_mps = await db.mps.find(
+        {"is_active": True},
+        {"_id": 1, "knesset_id": 1, "name": 1, "name_hebrew": 1, "party_name": 1, "photo_url": 1, "role": 1}
+    ).sort("name", 1).to_list(200)
+    for mp in all_mps:
+        party_name = mp.get("party_name")
+        if party_name and party_name not in known_parties:
+            known_parties[party_name] = {
+                "name": party_name,
+                "name_hebrew": None,
+                "leader": None,
+                "website": None,
+                "official_website": None,
+                "wikipedia_url": None,
+                "wing": None,
+                "bloc": None,
+            }
+
+    parties = []
+    for index, (party_name, party) in enumerate(known_parties.items()):
+        official_website = party.get("official_website") or party.get("website") or party.get("official_link")
+        parties.append({
+            "id": f"party_{index + 1}",
             "type": "party",
-            "name": party.get("name"),
+            "name": party.get("name") or party_name,
             "name_hebrew": party.get("name_hebrew"),
             "leader": party.get("leader"),
             "bloc": party.get("bloc"),
             "wing": party.get("wing"),
             "poll_seats_range": party.get("poll_seats_range"),
-            "official_link": party.get("official_link"),
-        }
-        for i, party in enumerate(ELECTION_2026_PARTIES)
-    ]
+            "official_link": official_website,
+            "official_website": official_website,
+            "website": official_website,
+            "wikipedia_url": party.get("wikipedia_url"),
+        })
+
+    parties.sort(key=lambda item: (item.get("bloc") or "", item.get("name") or ""))
 
     # Build candidate entries
-    db = get_db()
-    all_mps = await db.mps.find(
-        {"is_active": True},
-        {"_id": 1, "knesset_id": 1, "name": 1, "name_hebrew": 1, "party_name": 1, "photo_url": 1, "role": 1}
-    ).sort("name", 1).to_list(200)
 
     candidates = []
     for mp in all_mps:

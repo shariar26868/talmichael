@@ -231,6 +231,56 @@ SEED_COMMITTEE_ACTIONS = [
     },
 ]
 
+SEED_COMMITTEE_MEETINGS = [
+    {
+        "meeting_id": "meeting_001",
+        "committee": "Foreign Affairs and Defense Committee",
+        "title": "Security briefing on regional escalation",
+        "summary": "Committee members reviewed the latest security developments and the government’s response plan.",
+        "date": "2026-07-15",
+        "status": "upcoming",
+        "location": "Knesset, Jerusalem",
+        "knesset_link": "https://www.knesset.gov.il/",
+    },
+    {
+        "meeting_id": "meeting_002",
+        "committee": "Finance Committee",
+        "title": "Cost-of-living and housing review",
+        "summary": "Officials discussed rental pressure, housing supply, and the impact of recent budget decisions.",
+        "date": "2026-07-16",
+        "status": "upcoming",
+        "location": "Knesset, Jerusalem",
+        "knesset_link": "https://www.knesset.gov.il/",
+    },
+    {
+        "meeting_id": "meeting_003",
+        "committee": "Constitution, Law and Justice Committee",
+        "title": "Judicial oversight hearing",
+        "summary": "The committee heard from legal experts on oversight mechanisms and proposed reforms.",
+        "date": "2026-07-20",
+        "status": "upcoming",
+        "location": "Knesset, Jerusalem",
+        "knesset_link": "https://www.knesset.gov.il/",
+    },
+]
+
+SEED_COMMITTEE_NEWS = [
+    {
+        "news_id": "news_001",
+        "title": "Committee chair announces hearings on budget implementation",
+        "summary": "The chair of the Finance Committee said the upcoming hearings would focus on inflation relief and public services.",
+        "date": "2026-07-08",
+        "link": "https://www.knesset.gov.il/",
+    },
+    {
+        "news_id": "news_002",
+        "title": "Defense committee releases briefing on border preparedness",
+        "summary": "Officials briefed lawmakers on infrastructure and emergency response readiness following recent security developments.",
+        "date": "2026-07-06",
+        "link": "https://www.knesset.gov.il/",
+    },
+]
+
 
 async def get_knesset_sessions(
     limit: int = 20,
@@ -409,6 +459,8 @@ async def get_committee_actions(limit: int = 10) -> dict:
     return {
         "total": len(SEED_COMMITTEE_ACTIONS),
         "actions": SEED_COMMITTEE_ACTIONS[:limit],
+        "upcoming_meetings": SEED_COMMITTEE_MEETINGS[: max(3, min(limit, 5))],
+        "latest_news": SEED_COMMITTEE_NEWS[: max(2, min(limit, 4))],
         "source": "curated_seed_data",
         "note": "Data sourced from Knesset committee records and Israeli news — not AI-generated.",
     }

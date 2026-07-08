@@ -679,6 +679,38 @@ async def sync_parties() -> int:
     return synced
 
 
+def _build_mp_profile_payload(mp_doc: dict, fallback_id: Optional[str] = None) -> dict:
+    """Normalize an MP document into a profile payload with stable image and explanation fields."""
+    mp = dict(mp_doc)
+    mp_id = mp.get("_id")
+    if mp_id is None:
+        mp_id = mp.get("id") or fallback_id
+    if mp_id is not None:
+        mp["id"] = str(mp_id)
+    else:
+        mp["id"] = None
+
+    photo_url = mp.get("photo_url") or mp.get("image_url")
+    if not photo_url and mp.get("knesset_id"):
+        photo_url = f"https://knesset.gov.il/mk/images/members/{mp['knesset_id']}.jpg"
+    mp["photo_url"] = photo_url
+    mp["image_url"] = photo_url
+    mp["image"] = photo_url
+
+    bio = mp.get("bio") or mp.get("summary") or mp.get("explanation") or ""
+    if not bio:
+        party = mp.get("party_name") or "the Knesset"
+        role = mp.get("role") or "Member of Knesset"
+        bio = f"{role} representing {party}."
+    mp["bio"] = bio
+    mp["summary"] = bio
+    mp["short_bio"] = bio[:220]
+    mp["explanation"] = bio
+    mp["profile_text"] = bio
+    mp.pop("_id", None)
+    return mp
+
+
 async def sync_mps(limit: int = 200) -> int:
     """Sync active Knesset 25 members from Open Knesset CSV pipeline."""
     db = get_db()
@@ -1066,21 +1098,25 @@ async def get_all_mps(party_name: Optional[str] = None) -> list[dict]:
     query = {"is_active": True}
     if party_name:
         query["party_name"] = party_name
-    cursor = db.mps.find(query, {"_id": 0})
-    return await cursor.to_list(length=200)
+    cursor = db.mps.find(query)
+    mps = await cursor.to_list(length=200)
+    return [_build_mp_profile_payload(mp) for mp in mps]
 
 
 async def get_mp(mp_id: str) -> Optional[dict]:
     db = get_db()
+    query = {}
     try:
         oid = ObjectId(mp_id)
+        query = {"_id": oid}
     except Exception:
-        return None
-    mp = await db.mps.find_one({"_id": oid}, {"_id": 0})
+        query = {"knesset_id": int(mp_id) if mp_id.isdigit() else mp_id}
+
+    mp = await db.mps.find_one(query)
     if mp:
-        mp["id"] = mp_id
-        mp["quotes"] = await (db.mp_quotes.find({"mp_id": mp_id}, {"_id": 0})).to_list(50)
-        mp["actions"] = await (db.mp_actions.find({"mp_id": mp_id}, {"_id": 0})).to_list(50)
+        mp = _build_mp_profile_payload(mp, fallback_id=mp_id)
+        mp["quotes"] = await (db.mp_quotes.find({"mp_id": str(mp.get("id") or mp_id)}, {"_id": 0})).to_list(50)
+        mp["actions"] = await (db.mp_actions.find({"mp_id": str(mp.get("id") or mp_id)}, {"_id": 0})).to_list(50)
         if "committees" not in mp or not mp["committees"]:
             mp["committees"] = []
         if "bills_passed_count" not in mp or mp["bills_passed_count"] is None:
