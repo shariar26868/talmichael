@@ -43,7 +43,7 @@ async def summary_7days(
     background_tasks: BackgroundTasks,
     user_tier: str = Query(
         "free",
-        description="User tier: free | pro | platinum. Platinum gets richer AI summaries.",
+        description="User tier: free | pro. Pro gets richer AI summaries.",
     ),
     refresh: bool = Query(
         False,
@@ -78,7 +78,7 @@ async def summary_30days(
     background_tasks: BackgroundTasks,
     user_tier: str = Query(
         "free",
-        description="User tier: free | pro | platinum.",
+        description="User tier: free | pro.",
     ),
     refresh: bool = Query(
         False,

@@ -8,7 +8,7 @@ Features:
   - Full bias spectrum (far-left → far-right)
   - Vote deduplication (one vote per user per article, upsert)
   - Rate limiting (max 30 votes per hour per user)
-  - Tier-weighted consensus (Free=1x, Pro=1.5x, Platinum=2x, Expert=3x)
+  - Tier-weighted consensus (Free=1x, Pro=1.5x, Expert=3x)
 """
 
 import logging
@@ -232,7 +232,7 @@ async def compute_bias_consensus(article_id: str, ai_bias: str) -> BiasConsensus
     Rules:
     - If <5 user votes: trust AI assessment
     - If 5+ votes: use weighted majority from users
-    - Pro/Platinum votes weighted 1.5-2x more than free tier
+    - Pro votes weighted 1.5-2x more than free tier
     """
     db = get_db()
     
@@ -252,7 +252,7 @@ async def compute_bias_consensus(article_id: str, ai_bias: str) -> BiasConsensus
     
     # Compute weighted consensus from user votes
     weighted_votes = {}
-    tier_weights = {"free": 1.0, "pro": 1.5, "platinum": 2.0, "expert": 3.0}
+    tier_weights = {"free": 1.0, "pro": 1.5, "expert": 3.0}
 
     for vote in votes:
         tier = vote.get("user_tier", "free")
@@ -314,7 +314,7 @@ async def compute_credibility_consensus(source_name: str, ai_credibility: float)
         )
     
     # Compute weighted average from user votes
-    tier_weights = {"free": 1.0, "pro": 1.5, "platinum": 2.0, "expert": 3.0}
+    tier_weights = {"free": 1.0, "pro": 1.5, "expert": 3.0}
     total_weight = 0.0
     weighted_sum = 0.0
     

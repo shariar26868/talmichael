@@ -46,13 +46,13 @@ class BatchAnalyzeRequest(BaseModel):
 @router.post("/analyze", response_model=ArticleAnalysis)
 async def analyze(
     body: AnalyzeRequest,
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
 ):
     """
     Analyze a single article.
     - free: rule-based
     - pro: GPT-4o-mini with fallback
-    - platinum: GPT-4o-mini + Perplexity + Gemini
+    
     """
     return await analyze_article(
         guid=body.guid,
@@ -67,13 +67,13 @@ async def analyze(
 @router.post("/analyze/batch", response_model=list[ArticleAnalysis])
 async def analyze_batch_endpoint(
     body: BatchAnalyzeRequest,
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
 ):
     """
     Analyze up to 20 articles at once.
     - free: rule-based
     - pro: GPT-4o-mini with fallback
-    - platinum: GPT-4o-mini + Perplexity + Gemini
+    
     """
     if len(body.articles) > 20:
         raise HTTPException(status_code=400, detail="Max 20 articles per batch")
@@ -122,7 +122,7 @@ async def vote_bias(
     article_id: str,
     vote: BiasVoteCreate,
     user_id: str = Query(..., description="User ID (from JWT)"),
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
 ):
     """
     Submit bias assessment for an article.
@@ -160,7 +160,7 @@ async def vote_credibility(
     source_name: str,
     vote: CredibilityVoteCreate,
     user_id: str = Query(..., description="User ID (from JWT)"),
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
 ):
     """
     Submit credibility assessment for a news source.

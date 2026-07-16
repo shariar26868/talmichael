@@ -43,7 +43,12 @@ from app.utils.feed_config import (
     ISRAELI_SOURCES_FEEDS, INTERNATIONAL_SOURCES_FEEDS, ARABIC_SOURCES_FEEDS,
     get_all_feeds, get_feeds_by_language, get_source_info,
 )
-from app.utils.licensed_apis import fetch_from_newsapi, fetch_from_newsdata_io, fetch_from_gdelt
+from app.utils.licensed_apis import (
+    fetch_from_newsapi,
+    fetch_from_newsdata_io,
+    fetch_from_currents,
+    fetch_from_gdelt,
+)
 from app.utils.image_enricher import enrich_images
 
 logger = logging.getLogger(__name__)
@@ -252,6 +257,133 @@ def _select_sources_for_fetch(
     return selected[:max_sources]
 
 
+# ── DB freshness config ──────────────────────────────────────────────────────
+# Articles in DB are considered "fresh" if fetched within this many seconds.
+# Scheduler runs every hour, so 2h gives comfortable overlap.
+_DB_FRESH_SECONDS = 7200   # 2 hours
+_DB_MIN_ARTICLES  = 5      # Minimum articles needed to consider DB cache valid
+
+
+async def fetch_from_db(
+    category: str,
+    limit: int,
+    exclude_negative: bool = False,
+    exclude_positive: bool = False,
+    force_today_priority: bool = False,
+    source_type_filter: Optional[str] = None,
+) -> list:
+    """
+    Read articles for a category directly from MongoDB cached_articles.
+    Returns a list of dicts (already in NUZE flat format).
+    Returns [] if collection is empty or category has no articles.
+    """
+    try:
+        from app.core.database import get_db
+        db = get_db()
+
+        query: dict = {"category": category}
+        if source_type_filter:
+            query["source_type"] = source_type_filter
+
+        sort_field = [("pub_date", -1)]
+        if force_today_priority:
+            sort_field = [("fetched_at", -1), ("pub_date", -1)]
+
+        cursor = db.cached_articles.find(
+            query,
+            {"_id": 0},         # exclude MongoDB _id field from results
+        ).sort(sort_field).limit(limit * 3)   # fetch extra so we can filter
+
+        rows = await cursor.to_list(length=limit * 3)
+        if not rows:
+            return []
+
+        # Apply sentiment filters
+        filtered = []
+        for row in rows:
+            title = row.get("title", "")
+            desc  = row.get("description", "")
+            if exclude_negative and is_negative(title, desc):
+                continue
+            if exclude_positive:
+                positive_keywords = (
+                    "achievement", "success", "breakthrough", "award", "positive",
+                    "hope", "recovery", "progress", "improve", "winner",
+                )
+                if any(kw in f"{title} {desc}".lower() for kw in positive_keywords):
+                    continue
+            filtered.append(row)
+            if len(filtered) >= limit:
+                break
+
+        return filtered
+    except Exception as e:
+        logger.warning("fetch_from_db failed for category=%s: %s", category, e)
+        return []
+
+
+async def _db_has_fresh_articles(category: str, min_count: int = _DB_MIN_ARTICLES) -> bool:
+    """
+    Check if MongoDB has enough fresh articles for this category.
+    "Fresh" means fetched within _DB_FRESH_SECONDS.
+    """
+    try:
+        from app.core.database import get_db
+        from datetime import datetime, timedelta
+        db = get_db()
+        cutoff = datetime.utcnow() - timedelta(seconds=_DB_FRESH_SECONDS)
+        count = await db.cached_articles.count_documents(
+            {"category": category, "fetched_at": {"$gte": cutoff}},
+        )
+        return count >= min_count
+    except Exception:
+        return False
+
+
+def _db_rows_to_news_response(rows: list, category: str) -> "NewsResponse":
+    """Convert MongoDB document dicts into a NewsResponse."""
+    from app.utils.rss_parser import FeedMeta
+    from app.models.schemas import NewsArticle
+    from datetime import datetime
+
+    articles = []
+    for row in rows:
+        try:
+            # Convert any datetime objects to ISO strings for Pydantic
+            pub = row.get("pub_date")
+            if hasattr(pub, "isoformat"):
+                pub = pub.isoformat()
+            row["pub_date"] = pub or ""
+
+            # Ensure required fields exist
+            if not row.get("title") or not row.get("link"):
+                continue
+            row.setdefault("description", "")
+
+            articles.append(NewsArticle(**{k: v for k, v in row.items() if v is not None}))
+        except Exception as e:
+            logger.debug("Skipping malformed DB row: %s", e)
+            continue
+
+    israel_count = sum(1 for a in articles if getattr(a, "source_type", "") == "israel")
+    global_count  = len(articles) - israel_count
+
+    return NewsResponse(
+        meta=FeedMeta(
+            title=f"Cached News — {category.title()} (DB)",
+            description=(
+                f"{len(articles)} pre-fetched articles "
+                f"[{israel_count} Israel / {global_count} Global]"
+            ),
+            link="https://talmicahel.com",
+            last_build_date="",
+            fetched_at=datetime.utcnow().isoformat(),
+        ),
+        total=len(articles),
+        articles=articles,
+    )
+
+
 async def fetch_news(
     category: str,
     limit: int,
@@ -275,16 +407,49 @@ async def fetch_news(
     • exclude_positive: Remove positive sentiment articles (for Science/Education/Culture).
     • force_today_priority: If True, prioritize today's articles and stop showing older articles
       if threshold reached (for Security, Politics, Economy, Sport).
-    • with_analysis: Enable AI sentiment/bias analysis (pro/platinum users only).
+    • with_analysis: Enable AI sentiment/bias analysis (pro users only).
     """
     normalized_language = normalize_language(language)
 
-    # ── Cache key (include category, limit, language, tier, analysis) ─────────
+    # ── Layer 0: In-memory / Redis cache (fastest) ────────────────────────────
     if use_cache and not force_refresh:
         key = news_key(category, limit, False, exclude_negative, normalized_language, user_tier, with_analysis)
         cached = await cache_get(key)
         if cached:
+            logger.debug("[%s] Served from memory/Redis cache", category)
             return NewsResponse(**cached)
+
+    # ── Layer 1: MongoDB DB-first (fast path, ~50ms) ──────────────────────────
+    # Skip for scheduler system fetches (they must always hit live sources)
+    # Skip when AI analysis is requested (DB may not have analysis fields yet)
+    if not force_refresh and user_tier != "system" and not with_analysis:
+        db_fresh = await _db_has_fresh_articles(category)
+        if db_fresh:
+            rows = await fetch_from_db(
+                category=category,
+                limit=limit,
+                exclude_negative=exclude_negative,
+                exclude_positive=exclude_positive,
+                force_today_priority=force_today_priority,
+            )
+            if len(rows) >= _DB_MIN_ARTICLES:
+                news = _db_rows_to_news_response(rows, category)
+                # Store in fast cache so next request is even faster
+                key = news_key(category, limit, False, exclude_negative, normalized_language, user_tier, with_analysis)
+                await cache_set(key, news.model_dump(exclude_none=True), NEWS_TTL)
+                logger.info(
+                    "[%s] DB-first path: served %d articles from MongoDB (skipped RSS)",
+                    category, len(rows)
+                )
+                return news
+            else:
+                logger.info(
+                    "[%s] DB has %d articles (< %d min) — falling through to RSS fetch",
+                    category, len(rows), _DB_MIN_ARTICLES
+                )
+
+    # ── Layer 2: Live RSS + API fetch (slow path) ─────────────────────────────
+    logger.info("[%s] Live fetch path (DB miss or force_refresh=%s)", category, force_refresh)
 
     # ── Step 1: Build mixed source list ───────────────────────────────────────
     if israeli_only:
@@ -313,17 +478,31 @@ async def fetch_news(
         _fetch_single_feed(feed_url, source_name, per_source_limit)
         for source_name, feed_url in selected_sources
     ]
-    # Add licensed API fetches in parallel where available (non-blocking)
-    # NOTE: Disabled to avoid rate limiting (100 req/24hr limit reached)
-    # Uncomment when using paid API tiers or when rate limit has reset
-    # try:
-    #     # Use topic_query based on category
-    #     topic_query = category
-    #     fetch_tasks.append(fetch_from_newsapi(topic_query, limit=per_source_limit))
-    #     fetch_tasks.append(fetch_from_newsdata_io(topic_query, limit=per_source_limit))
-    #     fetch_tasks.append(fetch_from_gdelt(topic_query, limit=per_source_limit))
-    # except Exception:
-    #     pass
+
+    # ── Licensed API fetches (quota-safe) ────────────────────────────────────
+    # These APIs are only called for background scheduler jobs (user_tier="system").
+    # Real-time user requests use RSS feeds only to preserve daily quotas.
+    #
+    # Free-tier limits (per day):
+    #   NewsAPI     → 95 req/day  (hard cap 100, we stop at 95)
+    #   NewsData.io → 190 req/day (hard cap 200, we stop at 190)
+    #   Currents    → 590 req/hr  (generous, safe to use)
+    #   GDELT       → unlimited   (always on)
+    if user_tier == "system":
+        try:
+            fetch_tasks.append(fetch_from_newsapi(category, limit=per_source_limit))
+            fetch_tasks.append(fetch_from_newsdata_io(category, limit=per_source_limit))
+            fetch_tasks.append(fetch_from_currents(category, limit=per_source_limit))
+            fetch_tasks.append(fetch_from_gdelt(category, limit=per_source_limit))
+        except Exception as _api_err:
+            logger.warning("Licensed API task append failed: %s", _api_err)
+    else:
+        # Real-time user request: use GDELT only (unlimited, no quota risk)
+        try:
+            fetch_tasks.append(fetch_from_gdelt(category, limit=per_source_limit))
+        except Exception:
+            pass
+
     results = await asyncio.gather(*fetch_tasks, return_exceptions=True)
 
     all_articles = []
@@ -645,6 +824,10 @@ async def fetch_all_news(
     """Fetch all categories concurrently, each with mixed Israel + Global content."""
     from app.utils.feed_config import EXCLUDE_NEGATIVE_CATEGORIES
 
+    # Scheduler (user_tier="system") must always bypass DB-first and hit live RSS/APIs
+    # so that the DB gets populated with fresh data on every scheduled run.
+    _force_refresh = (user_tier == "system")
+
     tasks = [
         fetch_news(
             cat, limit,
@@ -652,6 +835,7 @@ async def fetch_all_news(
             user_tier=user_tier,
             with_analysis=with_analysis,
             use_cache=use_cache,
+            force_refresh=_force_refresh,
         )
         for cat in RSS_FEEDS
     ]
@@ -816,3 +1000,104 @@ async def fetch_knesset_bills(limit: int = 20) -> dict:
 
     await cache_set(key, result, BILLS_TTL)
     return result
+
+
+async def fetch_news_stats() -> dict:
+    """
+    Return DB statistics for all news categories.
+    Shows: total articles per category, last fetch time, freshness status.
+    Used by GET /news/db-status endpoint.
+    """
+    from app.core.database import get_db
+    from app.utils.feed_config import RSS_FEEDS
+    from datetime import datetime, timedelta
+
+    try:
+        db = get_db()
+        cutoff_fresh = datetime.utcnow() - timedelta(seconds=_DB_FRESH_SECONDS)
+        cutoff_today = datetime.utcnow() - timedelta(hours=24)
+
+        pipeline = [
+            {
+                "$group": {
+                    "_id": "$category",
+                    "total": {"$sum": 1},
+                    "fresh_count": {
+                        "$sum": {
+                            "$cond": [
+                                {"$gte": ["$fetched_at", cutoff_fresh]},
+                                1, 0
+                            ]
+                        }
+                    },
+                    "today_count": {
+                        "$sum": {
+                            "$cond": [
+                                {"$gte": ["$fetched_at", cutoff_today]},
+                                1, 0
+                            ]
+                        }
+                    },
+                    "last_fetched": {"$max": "$fetched_at"},
+                    "oldest_article": {"$min": "$pub_date"},
+                    "newest_article": {"$max": "$pub_date"},
+                }
+            },
+            {"$sort": {"_id": 1}},
+        ]
+
+        rows = await db.cached_articles.aggregate(pipeline).to_list(length=100)
+
+        category_stats = {}
+        for row in rows:
+            cat = row["_id"] or "unknown"
+            last_fetched = row.get("last_fetched")
+            is_fresh = bool(last_fetched and last_fetched >= cutoff_fresh)
+            category_stats[cat] = {
+                "total_articles": row["total"],
+                "fresh_articles": row["fresh_count"],   # fetched in last 2h
+                "today_articles":  row["today_count"],  # fetched in last 24h
+                "is_fresh": is_fresh,
+                "last_fetched": last_fetched.isoformat() if last_fetched else None,
+                "db_path": "DB-first ✅" if is_fresh and row["fresh_count"] >= _DB_MIN_ARTICLES else "RSS fallback ⚠️",
+            }
+
+        # Add categories that have no DB data yet
+        for cat in RSS_FEEDS:
+            if cat not in category_stats:
+                category_stats[cat] = {
+                    "total_articles": 0,
+                    "fresh_articles": 0,
+                    "today_articles": 0,
+                    "is_fresh": False,
+                    "last_fetched": None,
+                    "db_path": "No data yet — RSS fallback ❌",
+                }
+
+        total_all = sum(v["total_articles"] for v in category_stats.values())
+        fresh_cats = sum(1 for v in category_stats.values() if v["is_fresh"])
+
+        return {
+            "status": "ok",
+            "summary": {
+                "total_articles_in_db": total_all,
+                "categories_with_fresh_data": fresh_cats,
+                "total_categories": len(RSS_FEEDS),
+                "db_fresh_window_hours": _DB_FRESH_SECONDS // 3600,
+                "min_articles_for_db_path": _DB_MIN_ARTICLES,
+            },
+            "categories": category_stats,
+            "tip": (
+                "The background scheduler auto-refreshes all categories every 30 minutes. "
+                "On first boot, a warmup job runs immediately to pre-fill the DB. "
+                "If a category still shows 'RSS fallback', wait ~60s for the warmup to complete."
+            ),
+        }
+
+    except Exception as e:
+        logger.error("fetch_news_stats failed: %s", e)
+        return {
+            "status": "error",
+            "message": str(e),
+            "tip": "Make sure MongoDB is reachable and the scheduler has run at least once.",
+        }

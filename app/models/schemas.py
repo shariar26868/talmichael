@@ -331,7 +331,7 @@ class AuditLogEntry(BaseModel):
     timestamp: str
     models_used: list[str] = []  # ["rule-based", "gpt-4o-mini", "gemini-2.0-flash"]
     user_vote_count: int = 0
-    analysis_tier: str = "free"  # free / pro / platinum
+    analysis_tier: str = "free"  # free / pro
     final_bias: str = "unknown"
     final_credibility: float = 0.5
     consensus_source: str = "ai"  # ai / user_consensus / mixed

@@ -24,8 +24,11 @@ def _get_scheduler() -> AsyncIOScheduler:
 def start_scheduler():
     """Start the APScheduler and add periodic fetch jobs.
 
-    This schedules an hourly incremental fetch at minute 0, a nightly
-    full refresh at 00:05 Israel time, and a daily AI precompute queue.
+    Jobs:
+      - Startup warmup  : runs IMMEDIATELY on boot to pre-fill the DB
+      - Every 30 minutes: incremental fetch (keeps DB always fresh)
+      - Nightly 00:05   : large full refresh (400 articles per category)
+      - Daily 01:00     : AI precompute queue
     """
     if not settings.scheduler_enabled:
         logger.info("Scheduler disabled via settings")
@@ -34,17 +37,45 @@ def start_scheduler():
     sched = _get_scheduler()
 
     try:
-        # Hourly incremental fetch at minute 0
-        sched.add_job(_hourly_fetch_job, CronTrigger(minute=0), id="hourly_fetch", replace_existing=True)
+        # ── Startup warmup: runs once immediately after server boots ─────────
+        # This ensures the DB is pre-filled right away, not after 30 min.
+        sched.add_job(
+            _hourly_fetch_job,
+            trigger="date",       # run once at a specific time
+            id="startup_warmup",
+            replace_existing=True,
+            misfire_grace_time=120,
+        )
 
-        # Nightly full refresh at 00:05
-        sched.add_job(_nightly_full_refresh_job, CronTrigger(hour=0, minute=5), id="nightly_full_refresh", replace_existing=True)
+        # ── Every 30 minutes: keep DB fresh automatically ───────────────────
+        sched.add_job(
+            _hourly_fetch_job,
+            CronTrigger(minute="0,30"),
+            id="periodic_fetch",
+            replace_existing=True,
+        )
 
-        # Daily precompute analysis queue at 01:00
-        sched.add_job(_precompute_analysis_job, CronTrigger(hour=1, minute=0), id="precompute_analysis", replace_existing=True)
+        # ── Nightly full refresh at 00:05 (large batch) ─────────────────────
+        sched.add_job(
+            _nightly_full_refresh_job,
+            CronTrigger(hour=0, minute=5),
+            id="nightly_full_refresh",
+            replace_existing=True,
+        )
+
+        # ── Daily AI precompute queue at 01:00 ───────────────────────────
+        sched.add_job(
+            _precompute_analysis_job,
+            CronTrigger(hour=1, minute=0),
+            id="precompute_analysis",
+            replace_existing=True,
+        )
 
         sched.start()
-        logger.info("Scheduler started with hourly, nightly refresh, and daily AI precompute jobs (tz=%s)", settings.scheduler_timezone)
+        logger.info(
+            "Scheduler started — immediate warmup + every-30min fetch + nightly refresh (tz=%s)",
+            settings.scheduler_timezone,
+        )
     except Exception as e:
         logger.exception("Failed to start scheduler: %s", e)
 
@@ -63,15 +94,19 @@ async def _run_fetch_all(limit: int = 80, use_cache: bool = False):
     """Helper to call fetch_all_news in an async-safe way."""
     try:
         from app.services.news_service import fetch_all_news
-        # Run and discard result (news_service persists to DB)
+        # user_tier="system" triggers licensed APIs (NewsAPI, NewsData, etc.)
+        # force_refresh=True ensures we bypass DB-first and always hit live sources
+        # use_cache=False ensures fresh data is written to DB
         await fetch_all_news(
             limit=limit,
             user_tier="system",
             with_analysis=False,
-            use_cache=use_cache,
+            use_cache=False,
         )
+        logger.info("Scheduled fetch completed: fetched up to %d articles per category", limit)
     except Exception as e:
         logger.exception("Scheduled fetch failed: %s", e)
+
 
 
 def _hourly_fetch_job():

@@ -2,8 +2,11 @@
 """News API routes — every endpoint returns mixed Israel + Global content."""
 
 from typing import Optional
-from fastapi import APIRouter, Query
-from app.services.news_service import fetch_news, fetch_all_news, fetch_knesset_bills
+from fastapi import APIRouter, Query, BackgroundTasks
+from app.services.news_service import (
+    fetch_news, fetch_all_news, fetch_knesset_bills,
+    fetch_news_stats, fetch_from_db,
+)
 from app.routes.bills import list_bills as bills_list, get_bill as bills_get
 from app.models.schemas import NewsResponse
 from app.utils.feed_config import (
@@ -105,8 +108,8 @@ async def get_sources(
 @router.get("/news/international", response_model=NewsResponse)
 async def international(
     limit: int = Query(20, ge=1, le=100),
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
-    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro only)"),
 ):
     """
     International news: global affairs EXCLUDING Israel-related news.
@@ -125,8 +128,8 @@ async def international(
 @router.get("/news/israeli-international", response_model=NewsResponse)
 async def israeli_international(
     limit: int = Query(20, ge=1, le=100),
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
-    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro only)"),
 ):
     """
     Israeli-International news: what the world says ABOUT Israel ONLY.
@@ -139,11 +142,14 @@ async def israeli_international(
         language="hebrew",
         user_tier=user_tier,
         with_analysis=with_analysis,
-    )@router.get("/news/economy", response_model=NewsResponse)
+    )
+
+
+@router.get("/news/economy", response_model=NewsResponse)
 async def economy(
     limit: int = Query(20, ge=1, le=100),
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
-    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro only)"),
 ):
     """
     Economy & finance news.
@@ -162,8 +168,8 @@ async def economy(
 @router.get("/news/security", response_model=NewsResponse)
 async def security(
     limit: int = Query(20, ge=1, le=100),
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
-    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro only)"),
 ):
     """
     Security & defence news.
@@ -182,8 +188,8 @@ async def security(
 @router.get("/news/defence", response_model=NewsResponse)
 async def defence(
     limit: int = Query(20, ge=1, le=100),
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
-    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro only)"),
 ):
     """
     Deprecated: use /news/security instead.
@@ -200,8 +206,8 @@ async def defence(
 @router.get("/news/education", response_model=NewsResponse)
 async def education(
     limit: int = Query(20, ge=1, le=100),
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
-    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro only)"),
 ):
     """
     Education news — negative only (positive on /news/positive).
@@ -220,8 +226,8 @@ async def education(
 async def community(
     limit: int = Query(20, ge=1, le=100),
     exclude_negative: bool = Query(False),
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
-    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro only)"),
 ):
     """
     Community & society news.
@@ -240,8 +246,8 @@ async def community(
 async def political(
     limit: int = Query(20, ge=1, le=100),
     exclude_negative: bool = Query(False),
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
-    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro only)"),
 ):
     """
     Political news.
@@ -262,8 +268,8 @@ async def political(
 @router.get("/news/positive", response_model=NewsResponse)
 async def positive(
     limit: int = Query(20, ge=1, le=100),
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
-    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro only)"),
 ):
     """
     Positive & uplifting news — including social recommendations (restaurants, food, travel).
@@ -281,8 +287,8 @@ async def positive(
 @router.get("/news/sport", response_model=NewsResponse)
 async def sport(
     limit: int = Query(20, ge=1, le=100),
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
-    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro only)"),
 ):
     """
     Sports news — Israeli sports ONLY.
@@ -302,8 +308,8 @@ async def sport(
 @router.get("/news/culture", response_model=NewsResponse)
 async def culture(
     limit: int = Query(20, ge=1, le=100),
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
-    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro only)"),
 ):
     """
     Culture & entertainment news — negative only (positive on /news/positive).
@@ -321,8 +327,8 @@ async def culture(
 @router.get("/news/environment", response_model=NewsResponse)
 async def environment(
     limit: int = Query(20, ge=1, le=100),
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
-    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro only)"),
 ):
     """
     Environment & climate news.
@@ -339,8 +345,8 @@ async def environment(
 @router.get("/news/science", response_model=NewsResponse)
 async def science(
     limit: int = Query(20, ge=1, le=100),
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
-    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro only)"),
 ):
     """
     Science & technology news — negative only (positive on /news/positive).
@@ -391,8 +397,8 @@ async def news_get_bill(
 @router.get("/news/arabic", response_model=NewsResponse)
 async def arabic(
     limit: int = Query(20, ge=1, le=100),
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
-    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro only)"),
 ):
     """
     Arabic language news.
@@ -411,11 +417,108 @@ async def arabic(
 @router.get("/news/all")
 async def all_news(
     limit: int = Query(10, ge=1, le=50),
-    user_tier: str = Query("free", description="User tier: free|pro|platinum"),
-    with_analysis: bool = Query(False, description="Enable AI analysis (pro/platinum only)"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
+    with_analysis: bool = Query(False, description="Enable AI analysis (pro only)"),
 ):
     """
     All categories combined.
     Returns a unified feed of MIXED Israel + Global articles across all topics.
     """
     return await fetch_all_news(limit, user_tier=user_tier, with_analysis=with_analysis)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DB MONITORING & MANUAL REFRESH ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/news/db-status")
+async def db_status():
+    """
+    Show DB status for all news categories.
+
+    For each category shows:
+    - total_articles: how many articles are stored
+    - fresh_articles: fetched within the last 2 hours
+    - is_fresh: True if enough articles for DB-first serving
+    - db_path: DB-first ✅ or RSS fallback ⚠️
+    - last_fetched: when was the last fetch
+
+    The scheduler auto-refreshes every 30 minutes; on first boot a warmup
+    job runs immediately. If a category still shows 'RSS fallback' just
+    wait ~60s for the startup warmup to complete.
+    """
+    return await fetch_news_stats()
+
+
+@router.post("/news/refresh/all")
+async def refresh_all_categories(
+    background_tasks: BackgroundTasks,
+    limit: int = Query(40, ge=5, le=100),
+):
+    """
+    [Admin/Debug] Manually trigger a fresh fetch for ALL categories.
+
+    The scheduler already does this automatically every 30 minutes and on
+    server boot. Use this endpoint only if you need an immediate forced
+    refresh (e.g., after a deployment or feed outage).
+    """
+    from app.services.news_service import fetch_all_news
+
+    async def _do_full_refresh():
+        await fetch_all_news(
+            limit=limit,
+            user_tier="system",   # forces live RSS fetch + DB save
+            with_analysis=False,
+            use_cache=False,
+        )
+
+    background_tasks.add_task(_do_full_refresh)
+
+    return {
+        "status": "triggered",
+        "categories": list(RSS_FEEDS.keys()),
+        "message": (
+            f"Full refresh started for all {len(RSS_FEEDS)} categories in background. "
+            "Check GET /news/db-status in ~60s to see progress."
+        ),
+    }
+
+
+@router.post("/news/refresh/{category}")
+async def refresh_category(
+    category: str,
+    background_tasks: BackgroundTasks,
+    limit: int = Query(80, ge=10, le=200),
+):
+    """
+    [Admin/Debug] Manually trigger a fresh fetch for a single category.
+
+    The scheduler handles this automatically every 30 minutes. Use this
+    only when you need to force-refresh a specific category immediately.
+
+    Example: POST /news/refresh/political
+    """
+    valid_categories = list(RSS_FEEDS.keys())
+    if category not in valid_categories:
+        return {
+            "status": "error",
+            "message": f"Unknown category '{category}'",
+            "valid_categories": valid_categories,
+        }
+
+    async def _do_refresh():
+        await fetch_news(
+            category=category,
+            limit=limit,
+            user_tier="system",
+            force_refresh=True,
+            use_cache=False,
+        )
+
+    background_tasks.add_task(_do_refresh)
+
+    return {
+        "status": "triggered",
+        "category": category,
+        "message": f"Refresh started for '{category}' in background. Check /news/db-status in ~30s.",
+    }

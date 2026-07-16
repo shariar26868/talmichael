@@ -30,19 +30,49 @@ from app.routes.youtube import router as youtube_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import asyncio
+    import logging
+    _log = logging.getLogger("startup")
+
+    # ── Step 1: Initialize database indexes ───────────────────────────────────
     await init_db()
-    # start periodic scheduler (hourly fetches, nightly full refresh)
+
+    # ── Step 2: Start periodic scheduler (every 30 min + nightly) ────────────
     try:
         start_scheduler()
-    except Exception:
-        pass
+    except Exception as e:
+        _log.warning("Scheduler failed to start: %s", e)
+
+    # ── Step 3: Immediate DB warmup on startup ────────────────────────────────
+    # Runs a full fetch in the background RIGHT NOW so the DB is never empty.
+    # The scheduler also triggers one immediately, but this asyncio task is a
+    # direct backup — guarantees data even if APScheduler has issues.
+    async def _startup_warmup():
+        try:
+            from app.services.news_service import fetch_all_news
+            _log.info("🚀 Startup DB warmup started — fetching all categories...")
+            await fetch_all_news(
+                limit=50,           # 50 articles per category on startup
+                user_tier="system", # uses NewsAPI + NewsData + GDELT
+                with_analysis=False,
+                use_cache=False,
+            )
+            _log.info("✅ Startup DB warmup complete — DB is now pre-filled")
+        except Exception as e:
+            _log.error("Startup DB warmup failed: %s", e)
+
+    # Fire-and-forget: doesn't block server startup
+    asyncio.create_task(_startup_warmup())
+
     yield
-    # stop scheduler and close DB
+
+    # ── Shutdown ───────────────────────────────────────────────────────────────
     try:
         stop_scheduler()
     except Exception:
         pass
     await close_db()
+
 
 
 app = FastAPI(

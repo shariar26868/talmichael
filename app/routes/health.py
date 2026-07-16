@@ -17,8 +17,28 @@ async def health_status():
             "gemini": "configured" if settings.gemini_api_key else "not configured",
             "claude": "configured" if settings.claude_api_key else "not configured",
             "perplexity": "configured" if settings.perplexity_api_key else "not configured",
+            "newsapi": "configured" if settings.newsapi_key else "not configured",
+            "newsdata_io": "configured" if settings.newsdata_io_key else "not configured",
+            "currents": "configured" if settings.currents_api_key else "not configured",
+            "gdelt": "always available (no key needed)",
             "mongodb": "check via /political/mps or similar endpoint",
         },
+    }
+
+
+@router.get("/news-apis/quota")
+async def news_api_quota():
+    """
+    Show current daily quota usage for all licensed news APIs.
+    Use this to monitor how many requests are left before rate limits kick in.
+    """
+    from app.utils.licensed_apis import get_quota_status
+    quota = get_quota_status()
+    return {
+        "status": "ok",
+        "note": "NewsAPI and NewsData.io are only called by the background scheduler (not per user request).",
+        "gdelt": "unlimited — always fetched for real-time user requests",
+        "quota": quota,
     }
 
 

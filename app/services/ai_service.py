@@ -13,8 +13,7 @@ Provides per-article:
 Uses OpenAI GPT-4o.  Falls back to rule-based analysis when
 OPENAI_API_KEY is not set (free-tier / dev mode).
 
-For platinum tier, the ensemble is designed to support OpenAI + Gemini + Claude.
-Claude support is reserved for later integration.
+For pro tier, the analysis runs OpenAI and Gemini.
 """
 
 import asyncio
@@ -1009,7 +1008,6 @@ async def analyze_article(
         Tiers:
             - free: rule-based only
             - pro: GPT-4o-mini with rule-based fallback
-            - platinum: GPT-4o-mini + Perplexity + Gemini + rule-based fallback
     """
     cache_key = ai_analysis_key(guid)
     cached = await cache_get(cache_key)
@@ -1024,50 +1022,19 @@ async def analyze_article(
         result.guid = guid
 
     elif tier == "pro":
-        if settings.openai_api_key:
-            raw = await _openai_analysis(title, description, source)
-            if raw:
-                try:
-                    result = ArticleAnalysis(
-                        guid=guid,
-                        sentiment=raw.get("sentiment", "neutral"),
-                        bias=raw.get("bias", "unknown"),
-                        bias_score=float(raw.get("bias_score", 0.5)),
-                        bias_types=raw.get("bias_types", []),
-                        credibility_score=float(raw.get("credibility_score", 0.5)),
-                        credibility_label=raw.get("credibility_label", "needs review"),
-                        fact_check_score=float(raw.get("fact_check_score", 0.5)),
-                        summary_hebrew=raw.get("summary_hebrew", ""),
-                        topics=raw.get("topics", ["general"]),
-                        claims=raw.get("claims", []),
-                        factual_points=raw.get("factual_points", []),
-                        bias_category=raw.get("bias_category", ""),
-                        claim_explanation=raw.get("claim_explanation", ""),
-                        bias_explanation=raw.get("bias_explanation", ""),
-                        bias_score_explanation=raw.get("bias_score_explanation", ""),
-                    )
-                except Exception as e:
-                    logger.warning("Failed to parse OpenAI response: %s", e)
-
-        if result is None:
-            result = _rule_based_analysis(title, description, source, source_url)
-            result.guid = guid
-
-    elif tier == "platinum":
         tasks = []
+        task_names = []
         if settings.openai_api_key:
             tasks.append(_openai_analysis(title, description, source))
-        if settings.perplexity_api_key:
-            tasks.append(_perplexity_analysis(title, description, source))
+            task_names.append("openai")
         if settings.gemini_api_key:
             tasks.append(_gemini_analysis(title, description, source))
-        if settings.claude_api_key:
-            tasks.append(_claude_analysis(title, description, source))
+            task_names.append("gemini")
 
         responses = await asyncio.gather(*tasks, return_exceptions=True) if tasks else []
         analyses: list[ArticleAnalysis] = []
 
-        for response in responses:
+        for name, response in zip(task_names, responses):
             if isinstance(response, Exception) or response is None:
                 continue
             if isinstance(response, dict):
@@ -1088,13 +1055,17 @@ async def analyze_article(
                         bias_category=response.get("bias_category", ""),
                         claim_explanation=response.get("claim_explanation", ""),
                         bias_explanation=response.get("bias_explanation", ""),
+                        bias_score_explanation=response.get("bias_score_explanation", ""),
                     )
                     analyses.append(analysis)
                 except Exception as e:
-                    logger.warning("Failed to parse ensemble response: %s", e)
+                    logger.warning("Failed to parse %s response: %s", name, e)
 
         if analyses:
-            result = _merge_analysis(analyses, guid)
+            if len(analyses) > 1:
+                result = _merge_analysis(analyses, guid)
+            else:
+                result = analyses[0]
         else:
             result = _rule_based_analysis(title, description, source, source_url)
             result.guid = guid
@@ -1124,14 +1095,10 @@ async def analyze_article(
         from datetime import datetime
         db = get_db()
         models_used = ["rule-based"]
-        if tier == "pro" and settings.openai_api_key:
-            models_used = ["gpt-4o-mini", "rule-based"]
-        elif tier == "platinum":
+        if tier == "pro":
             models_used = [m for m, k in [
                 ("gpt-4o-mini", settings.openai_api_key),
-                ("sonar", settings.perplexity_api_key),
                 ("gemini-2.0-flash", settings.gemini_api_key),
-                ("claude-sonnet-4", settings.claude_api_key),
             ] if k] or ["rule-based"]
 
         await db.analysis_audit_log.insert_one({

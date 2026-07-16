@@ -76,6 +76,17 @@ async def init_db() -> None:
         IndexModel([("fetched_at", DESCENDING)], name="cached_articles_fetched_at_key"),
         IndexModel([("first_seen", DESCENDING)], name="cached_articles_first_seen_key"),
         IndexModel([("source_type", ASCENDING)], name="cached_articles_source_type_key"),
+        # ── Compound indexes for DB-first fast path ───────────────────────
+        # Used by fetch_from_db(): filters by category + sorts by pub_date
+        IndexModel(
+            [("category", ASCENDING), ("pub_date", DESCENDING)],
+            name="cached_articles_cat_pubdate_key",
+        ),
+        # Used by _db_has_fresh_articles(): filters by category + fetched_at cutoff
+        IndexModel(
+            [("category", ASCENDING), ("fetched_at", DESCENDING)],
+            name="cached_articles_cat_fetchedat_key",
+        ),
     ])
 
     # knesset_bills
