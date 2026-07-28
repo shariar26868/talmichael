@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI):
             await fetch_all_news(
                 limit=50,           # 50 articles per category on startup
                 user_tier="system", # uses NewsAPI + NewsData + GDELT
-                with_analysis=False,
+                with_analysis=True, # precomputes AI analysis (bias, summary, credibility)
                 use_cache=False,
             )
             _log.info("✅ Startup DB warmup complete — DB is now pre-filled")

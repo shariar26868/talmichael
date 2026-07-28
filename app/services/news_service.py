@@ -355,12 +355,9 @@ def _db_rows_to_news_response(rows: list, category: str) -> "NewsResponse":
                 pub = pub.isoformat()
             row["pub_date"] = pub or ""
 
-            # Ensure required fields exist
-            if not row.get("title") or not row.get("link"):
-                continue
-            row.setdefault("description", "")
-
-            articles.append(NewsArticle(**{k: v for k, v in row.items() if v is not None}))
+            art = NewsArticle(**{k: v for k, v in row.items() if v is not None})
+            _apply_fact_check_fallbacks(art)
+            articles.append(art)
         except Exception as e:
             logger.debug("Skipping malformed DB row: %s", e)
             continue
@@ -421,8 +418,7 @@ async def fetch_news(
 
     # ── Layer 1: MongoDB DB-first (fast path, ~50ms) ──────────────────────────
     # Skip for scheduler system fetches (they must always hit live sources)
-    # Skip when AI analysis is requested (DB may not have analysis fields yet)
-    if not force_refresh and user_tier != "system" and not with_analysis:
+    if not force_refresh and user_tier != "system":
         db_fresh = await _db_has_fresh_articles(category)
         if db_fresh:
             rows = await fetch_from_db(
@@ -1101,3 +1097,41 @@ async def fetch_news_stats() -> dict:
             "message": str(e),
             "tip": "Make sure MongoDB is reachable and the scheduler has run at least once.",
         }
+
+
+async def fetch_all_news_bulk(limit: int = 20, user_tier: str = "free") -> dict:
+    """
+    Fetch precomputed DB articles for ALL categories concurrently (<100ms).
+    Returns ready-to-render articles grouped by category.
+    Allows frontend to pre-populate local state on initial launch for 0ms dropdown switching.
+    """
+    categories = list(RSS_FEEDS.keys())
+    
+    tasks = [
+        fetch_news(
+            cat,
+            limit=limit,
+            user_tier=user_tier,
+            with_analysis=True,
+            use_cache=True,
+        )
+        for cat in categories
+    ]
+    responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+    category_data = {}
+    for cat, resp in zip(categories, responses):
+        if isinstance(resp, Exception):
+            category_data[cat] = []
+        else:
+            try:
+                category_data[cat] = resp.model_dump(exclude_none=True).get("articles", [])
+            except Exception:
+                category_data[cat] = []
+
+    return {
+        "status": "success",
+        "total_categories": len(categories),
+        "categories": category_data,
+    }
+

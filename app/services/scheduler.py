@@ -100,10 +100,10 @@ async def _run_fetch_all(limit: int = 80, use_cache: bool = False):
         await fetch_all_news(
             limit=limit,
             user_tier="system",
-            with_analysis=False,
+            with_analysis=True,
             use_cache=False,
         )
-        logger.info("Scheduled fetch completed: fetched up to %d articles per category", limit)
+        logger.info("Scheduled fetch completed: fetched & precomputed AI analysis for up to %d articles per category", limit)
     except Exception as e:
         logger.exception("Scheduled fetch failed: %s", e)
 

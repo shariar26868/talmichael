@@ -4,7 +4,7 @@
 from typing import Optional
 from fastapi import APIRouter, Query, BackgroundTasks
 from app.services.news_service import (
-    fetch_news, fetch_all_news, fetch_knesset_bills,
+    fetch_news, fetch_all_news, fetch_all_news_bulk, fetch_knesset_bills,
     fetch_news_stats, fetch_from_db,
 )
 from app.routes.bills import list_bills as bills_list, get_bill as bills_get
@@ -104,6 +104,19 @@ async def get_sources(
 # NEWS ENDPOINTS — All return MIXED Israel + Global content
 # Topic keyword filters ensure topical relevance is maintained.
 # ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/news/all-precomputed")
+async def get_all_precomputed_news(
+    limit: int = Query(20, ge=1, le=50, description="Articles per category"),
+    user_tier: str = Query("free", description="User tier: free|pro"),
+):
+    """
+    Bulk all-categories precomputed feed endpoint.
+    Returns pre-analyzed AI articles for ALL categories at once in a single fast call (<100ms).
+    Allows frontend to pre-populate local state on software launch for ZERO-DELAY (0ms) dropdown switching.
+    """
+    return await fetch_all_news_bulk(limit=limit, user_tier=user_tier)
+
 
 @router.get("/news/international", response_model=NewsResponse)
 async def international(
