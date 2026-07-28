@@ -729,6 +729,19 @@ async def _openai_analysis(
             response_format={"type": "json_object"},
         )
 
+        if getattr(response, "usage", None):
+            try:
+                from app.services.ai_cost_service import log_ai_usage
+                asyncio.create_task(log_ai_usage(
+                    user_id="system",
+                    endpoint="/ai/analyze",
+                    model="gpt-4o-mini",
+                    prompt_tokens=response.usage.prompt_tokens,
+                    completion_tokens=response.usage.completion_tokens,
+                ))
+            except Exception:
+                pass
+
         return json.loads(response.choices[0].message.content)
 
     except Exception as e:

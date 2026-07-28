@@ -26,6 +26,7 @@ from app.routes.politics101 import router as politics101_router
 from app.routes.election_voting import router as election_voting_router
 from app.routes.pulse import router as pulse_router
 from app.routes.youtube import router as youtube_router
+from app.routes.analytics import router as analytics_router
 
 
 @asynccontextmanager
@@ -111,6 +112,7 @@ app.include_router(politics101_router)
 app.include_router(election_voting_router)
 app.include_router(pulse_router)
 app.include_router(youtube_router)
+app.include_router(analytics_router)
 
 
 

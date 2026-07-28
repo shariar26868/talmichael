@@ -100,6 +100,19 @@ async def ask_gpt(
         answer = resp.choices[0].message.content.strip()
         tokens = resp.usage.total_tokens if resp.usage else 0
 
+        if getattr(resp, "usage", None):
+            try:
+                from app.services.ai_cost_service import log_ai_usage
+                asyncio.create_task(log_ai_usage(
+                    user_id="user_qa",
+                    endpoint="/ai/qa",
+                    model=model,
+                    prompt_tokens=resp.usage.prompt_tokens,
+                    completion_tokens=resp.usage.completion_tokens,
+                ))
+            except Exception:
+                pass
+
         result = {"answer": answer, "model": model, "tokens_used": tokens, "cached": False}
         await cache_set(cache_key, result, QA_TTL)
         return result
