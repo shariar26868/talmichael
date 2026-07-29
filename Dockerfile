@@ -8,8 +8,9 @@ RUN addgroup --system appgroup \
 
 # Install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip setuptools \
+RUN pip install --no-cache-dir --upgrade pip "setuptools<70.0.0" \
     && pip install --no-cache-dir -r requirements.txt
+
 
 # Copy application source
 COPY app/    ./app/
