@@ -285,9 +285,10 @@ async def fetch_from_db(
         if source_type_filter:
             query["source_type"] = source_type_filter
 
-        sort_field = [("pub_date", -1)]
-        if force_today_priority:
-            sort_field = [("fetched_at", -1), ("pub_date", -1)]
+        # Always sort by fetched_at first (most recently fetched = freshest from RSS)
+        # then by pub_date as secondary. This ensures newly fetched articles always
+        # surface even if their pub_date strings are in unexpected formats.
+        sort_field = [("fetched_at", -1), ("pub_date", -1)]
 
         cursor = db.cached_articles.find(
             query,

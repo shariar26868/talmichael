@@ -55,8 +55,12 @@ CATEGORY_IMAGE_QUERIES = {
     "international-pure": "world news global event diplomacy",
 }
 
-# Unsplash API endpoints (free, no auth key required for basic search)
-UNSPLASH_SEARCH_API = "https://unsplash.com/api/apps/xGBGo0gnWlg91JXqXJ15eIw36QyxzVgVYbb3zqa04Ow/search/photos"
+# Unsplash public API — requires a free access key (UNSPLASH_ACCESS_KEY in .env)
+UNSPLASH_SEARCH_API = "https://api.unsplash.com/search/photos"
+
+# Picsum Photos — completely free fallback, no API key needed.
+# Returns beautiful, high-quality stock images by seed/category.
+PICSUM_BASE_URL = "https://picsum.photos/seed/{seed}/800/450"
 
 # Domains known to NOT have og:image in their pages — skip fetching entirely
 _NO_OG_DOMAINS: set[str] = set()
@@ -100,7 +104,10 @@ def _unsplash_cache_key(query: str) -> str:
 
 async def _fetch_unsplash_image(query: str) -> Optional[str]:
     """
-    Fetch a random high-quality image from Unsplash based on query.
+    Fetch a random high-quality image for the given query.
+    Strategy:
+      1. Unsplash API (if UNSPLASH_ACCESS_KEY is configured in .env)
+      2. Picsum Photos (free fallback — beautiful stock images, no key needed)
     Returns the image URL or None on failure.
     Caches results to avoid repeated requests for same query.
     """
@@ -113,41 +120,50 @@ async def _fetch_unsplash_image(query: str) -> Optional[str]:
     if cached is not None:
         return cached if cached else None
 
+    # ── Try Unsplash official API (requires free access key) ─────────────────
     try:
-        async with httpx.AsyncClient(
-            timeout=FETCH_TIMEOUT,
-            headers=_HEADERS,
-            follow_redirects=True,
-            trust_env=False,
-        ) as client:
-            # Unsplash API: search for images by query
-            params = {
-                "query": query,
-                "page": "1",
-                "per_page": "1",
-                "order_by": "relevant",
-            }
-            resp = await client.get(UNSPLASH_SEARCH_API, params=params)
-            if resp.status_code != 200:
-                await cache_set(cache_key, "", IMAGE_TTL)
-                return None
-
-            data = resp.json()
-            if not data.get("results"):
-                await cache_set(cache_key, "", IMAGE_TTL)
-                return None
-
-            # Get the first result's image URL (high resolution version)
-            image = data["results"][0]
-            image_url = image.get("urls", {}).get("regular")  # 1080x1080+ regular size
-
-            await cache_set(cache_key, image_url or "", IMAGE_TTL)
-            return image_url
-
+        from app.core.config import settings
+        unsplash_key = getattr(settings, "unsplash_access_key", None)
+        if unsplash_key:
+            async with httpx.AsyncClient(
+                timeout=FETCH_TIMEOUT,
+                headers={**_HEADERS, "Authorization": f"Client-ID {unsplash_key}"},
+                follow_redirects=True,
+                trust_env=False,
+            ) as client:
+                params = {
+                    "query": query,
+                    "page": "1",
+                    "per_page": "1",
+                    "order_by": "relevant",
+                    "orientation": "landscape",
+                }
+                resp = await client.get(UNSPLASH_SEARCH_API, params=params)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    results = data.get("results", [])
+                    if results:
+                        image_url = results[0].get("urls", {}).get("regular")
+                        if image_url:
+                            await cache_set(cache_key, image_url, IMAGE_TTL)
+                            return image_url
     except Exception as exc:
-        logger.debug(f"Unsplash fetch failed [{query}]: {exc}")
-        await cache_set(cache_key, "", IMAGE_TTL)
-        return None
+        logger.debug(f"Unsplash API fetch failed [{query}]: {exc}")
+
+    # ── Fallback: Picsum Photos (free, no key, always works) ─────────────────
+    # Use a deterministic seed from query string so the same query always
+    # returns the same image (better UX consistency).
+    try:
+        import hashlib
+        seed = hashlib.md5(query.encode()).hexdigest()[:8]
+        picsum_url = PICSUM_BASE_URL.format(seed=seed)
+        await cache_set(cache_key, picsum_url, IMAGE_TTL)
+        return picsum_url
+    except Exception as exc:
+        logger.debug(f"Picsum fallback failed [{query}]: {exc}")
+
+    await cache_set(cache_key, "", IMAGE_TTL)
+    return None
 
 
 def _extract_keywords_from_title(title: str, max_words: int = 3) -> str:
@@ -289,7 +305,7 @@ async def _fetch_og_image(url: str, description: str = "") -> Optional[str]:
         ) as client:
             resp = await client.get(resolved_url)
             if resp.status_code >= 400:
-                await cache_set(cache_key, "", OG_IMAGE_TTL)
+                await cache_set(cache_key, "", IMAGE_TTL)
                 return None
 
             # Read only the first MAX_HTML_BYTES to find <head> og tags

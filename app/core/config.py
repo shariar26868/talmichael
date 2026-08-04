@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     currents_api_key: str = ""
     mediastack_api_key: str = ""
 
+    # Image enrichment
+    unsplash_access_key: str = ""  # Free key from unsplash.com/oauth/applications
+
     # Celery / Broker
     celery_broker_url: str = ""
     celery_result_backend: str = ""

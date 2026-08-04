@@ -112,23 +112,15 @@ async def _run_fetch_all(limit: int = 80, use_cache: bool = False):
 def _hourly_fetch_job():
     # schedule into event loop
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
+        asyncio.ensure_future(_run_fetch_all(limit=80), loop=loop)
     except RuntimeError:
-        loop = None
-    if loop and loop.is_running():
-        asyncio.ensure_future(_run_fetch_all(limit=80))
-    else:
-        # If no running loop, run in new loop
+        # No running loop — create one (shouldn't happen in APScheduler context)
         asyncio.run(_run_fetch_all(limit=80))
 
 
 def _precompute_analysis_job():
     """Run a larger fetch and enqueue article batches for AI analysis."""
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = None
-
     async def _run():
         from app.services.news_service import fetch_all_news
         try:
@@ -144,9 +136,10 @@ def _precompute_analysis_job():
         except Exception as e:
             logger.exception("Precompute analysis job failed: %s", e)
 
-    if loop and loop.is_running():
-        asyncio.ensure_future(_run())
-    else:
+    try:
+        loop = asyncio.get_running_loop()
+        asyncio.ensure_future(_run(), loop=loop)
+    except RuntimeError:
         asyncio.run(_run())
 
 
@@ -174,10 +167,8 @@ def _enqueue_precompute_batches(articles: list):
 
 def _nightly_full_refresh_job():
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
+        asyncio.ensure_future(_run_fetch_all(limit=400), loop=loop)
     except RuntimeError:
-        loop = None
-    if loop and loop.is_running():
-        asyncio.ensure_future(_run_fetch_all(limit=400))
-    else:
         asyncio.run(_run_fetch_all(limit=400))
+

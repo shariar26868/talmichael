@@ -224,11 +224,16 @@ async def list_bills(
         ]
         real_query["$or"] = date_filters
 
-    real_cursor = db.knesset_bills.find(real_query).sort("last_updated", -1)
-    real_docs = await real_cursor.to_list(length=50)
+    # Sort by updated_at (datetime) first — most reliable recency signal.
+    # Fall back includes last_updated string sort as secondary.
+    # Fetch more to ensure we have enough after filtering.
+    real_cursor = db.knesset_bills.find(real_query).sort(
+        [("updated_at", -1), ("last_updated", -1)]
+    )
+    real_docs = await real_cursor.to_list(length=100)
 
-    # Cap list view real bills processing to 10 to keep API response times low
-    real_docs = real_docs[:10]
+    # Cap real bills to 25 (up from 10) so clients get more fresh content
+    real_docs = real_docs[:25]
     combined_docs = filtered_mock_docs + real_docs
 
     # Parallel AI Analysis Pipeline with Semaphore
@@ -333,6 +338,17 @@ async def get_bill(
     if not category_tags:
         sub_type = doc.get("sub_type") or doc.get("type")
         category_tags = [sub_type] if sub_type else ["Legislation"]
+
+    # Build verification sources from whichever source field is present
+    verification_sources = []
+    for key in ["official_source_url", "source_url", "source_links", "sources"]:
+        value = doc.get(key)
+        if isinstance(value, str) and value:
+            verification_sources.append(value)
+        elif isinstance(value, list):
+            verification_sources.extend([str(v) for v in value if v])
+    if not verification_sources:
+        verification_sources = ["Knesset.gov.il / official legislative record"]
 
     # Handle AI analysis based on tier and parameter
     explanation = None
